@@ -1,0 +1,2461 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kodak Pixel | نظام الكاشير</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --red:#E4212B;
+    --red-dark:#B8161F;
+    --ink:#1D1D1F;
+    --bg:#F4F5F7;
+    --panel:#FFFFFF;
+    --border:#E4E6EA;
+    --muted:#7A7D85;
+    --green:#1FA463;
+    --amber:#D98C11;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Cairo',sans-serif; background:var(--bg); color:var(--ink);
+  }
+  header{
+    background:var(--ink); color:#fff; display:flex; align-items:center;
+    justify-content:space-between; padding:0 24px; height:64px;
+  }
+  .logo{font-weight:800; font-size:22px;}
+  .logo span{color:var(--red);}
+  nav{display:flex; gap:6px;}
+  nav button{
+    background:transparent; border:none; color:#cfd0d4; font-family:inherit;
+    font-size:15px; padding:10px 16px; border-radius:8px; cursor:pointer; transition:.15s;
+  }
+  nav button:hover{background:#2c2c30; color:#fff;}
+  nav button.active{background:var(--red); color:#fff;}
+  .sync-box{display:flex; align-items:center; gap:10px; font-size:13px;}
+  .dot{width:9px; height:9px; border-radius:50%; background:var(--muted);}
+  .dot.online{background:var(--green);}
+  .dot.pending{background:var(--amber);}
+  .sync-box button{
+    background:var(--red); color:#fff; border:none; padding:8px 14px;
+    border-radius:8px; font-family:inherit; cursor:pointer; font-size:13px;
+  }
+  main{padding:24px; max-width:1400px; margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+  h2{margin:0 0 16px;}
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px;}
+  .grid-2{display:grid; grid-template-columns:1fr 1.4fr; gap:20px;}
+  label{display:block; font-size:13px; color:var(--muted); margin:14px 0 6px;}
+  input, select{
+    width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px;
+    font-family:inherit; font-size:14px;
+  }
+  .btn{
+    background:var(--red); color:#fff; border:none; padding:11px 18px; border-radius:8px;
+    font-family:inherit; font-size:14px; cursor:pointer; font-weight:600;
+  }
+  .btn:hover{background:var(--red-dark);}
+  .btn.secondary{background:#fff; color:var(--ink); border:1px solid var(--border);}
+  .btn.small{padding:6px 12px; font-size:13px;}
+  .btn.danger{background:#fff; color:var(--red); border:1px solid var(--red);}
+  table{width:100%; border-collapse:collapse; font-size:14px;}
+  th, td{padding:10px 12px; text-align:right; border-bottom:1px solid var(--border);}
+  th{color:var(--muted); font-weight:600; background:#FAFAFB;}
+  .products-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr));
+    gap:10px; max-height:520px; overflow-y:auto; padding:4px;
+  }
+  .product-card{
+    background:#F0F1F3; border:1px solid var(--border); border-radius:10px; padding:14px 10px;
+    text-align:center; cursor:pointer; transition:.15s;
+  }
+  .product-card:hover{border-color:var(--red); background:#fff;}
+  .product-card .p-name{font-weight:600; font-size:13px;}
+  .product-card .p-price{color:var(--red); font-weight:700; margin-top:6px;}
+  .cart-total{font-size:15px; margin-top:14px; padding-top:14px; border-top:1px dashed var(--border);}
+  .cart-total b{color:var(--red); font-size:19px;}
+  .badge{padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600;}
+  .badge.synced{background:#e8f7ef; color:var(--green);}
+  .badge.pending{background:#fdf3e3; color:var(--amber);}
+  .top-actions{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;}
+  .search-bar{max-width:320px;}
+  .modal-bg{
+    position:fixed; inset:0; background:rgba(0,0,0,.4); display:none;
+    align-items:center; justify-content:center; z-index:50;
+  }
+  .modal-bg.active{display:flex;}
+  .modal{background:#fff; border-radius:12px; padding:24px; width:360px;}
+  .modal h3{margin-top:0;}
+  .empty{color:var(--muted); text-align:center; padding:40px 0;}
+  .hidden{display:none !important;}
+  .login-overlay{
+    position:fixed; inset:0; background:var(--ink); z-index:100;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .login-card{background:#fff; border-radius:14px; padding:34px; width:340px; text-align:center;}
+  .login-card .logo{color:var(--ink); font-size:26px; margin-bottom:6px;}
+  .login-card p{color:var(--muted); font-size:13px; margin-top:0;}
+  .shift-bar{display:flex; align-items:center; gap:10px; font-size:13px; color:#cfd0d4;}
+  .shift-bar .btn{padding:7px 12px; font-size:13px;}
+  .user-chip{display:flex; align-items:center; gap:8px; font-size:13px; color:#cfd0d4;}
+  .user-chip .role-tag{background:#33343a; padding:2px 8px; border-radius:20px; font-size:11px;}
+  .summary-modal .modal{width:460px;}
+  .summary-row{display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:14px;}
+  .summary-row.total{font-weight:800; font-size:16px; color:var(--red); border-bottom:none;}
+  select:disabled, input:disabled{background:#F0F1F3; color:var(--muted); cursor:not-allowed;}
+  .toast{
+    position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:#fff; padding:14px 22px; border-radius:10px;
+    font-size:14px; font-weight:600; box-shadow:0 6px 20px rgba(0,0,0,.25);
+    z-index:200; opacity:0; pointer-events:none; transition:opacity .25s, transform .25s;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  .toast.success{background:var(--green);}
+  .wide-modal .modal{width:860px; max-width:94vw; max-height:90vh; overflow-y:auto;}
+  .wide-modal h4{margin:18px 0 8px;}
+  .admin-close-box{
+    background:#fdf3e3; border:1px solid var(--amber); border-radius:10px;
+    padding:14px; margin:14px 0; display:flex; flex-direction:column; gap:8px;
+  }
+  .admin-close-box label{font-weight:600; font-size:13px;}
+  .admin-close-box .btn{align-self:flex-start; margin-top:4px;}
+</style>
+</head>
+<body>
+
+<div class="toast" id="app-toast"></div>
+
+<header>
+  <div class="logo">Kodak<span>Pixel</span></div>
+  <nav>
+    <button data-view="invoice-new" class="active">فاتورة جديدة</button>
+    <button data-view="invoices">الفواتير</button>
+    <button data-view="expenses">المصروفات</button>
+    <button data-view="advances">السلف</button>
+    <button data-view="products" class="admin-only">المنتجات</button>
+    <button data-view="branches" class="admin-only">الفروع</button>
+    <button data-view="users" class="admin-only">الموظفين</button>
+    <button data-view="salaries" class="admin-only">الرواتب والسلف</button>
+    <button data-view="reports" class="admin-only">تقفيل الشفتات والتقارير</button>
+    <button data-view="settings" class="admin-only">الإعدادات</button>
+  </nav>
+  <div class="shift-bar">
+    <span id="shiftStatus">-</span>
+    <button class="btn" id="closeShiftBtn">إغلاق الشفت</button>
+  </div>
+  <div class="user-chip">
+    <span id="currentUserName">-</span>
+    <span class="role-tag" id="currentUserRole">-</span>
+  </div>
+  <div class="sync-box">
+    <span class="dot" id="netDot"></span>
+    <span id="syncLabel">جاري التحقق...</span>
+    <button id="syncBtn">مزامنة الآن</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ فاتورة جديدة ============ -->
+  <section class="view active" id="view-invoice-new">
+    <div class="grid-2">
+      <div class="panel">
+        <h2>بيانات العميل</h2>
+        <label>الفرع</label>
+        <select id="inv-branch"></select>
+        <label>اسم العميل</label>
+        <input id="inv-customer-name" placeholder="اسم العميل">
+        <label>رقم الهاتف</label>
+        <input id="inv-customer-phone" placeholder="01xxxxxxxxx">
+        <label>الخصم %</label>
+        <input id="inv-discount" type="number" value="0" min="0" max="100">
+        <label class="checkbox-label" style="display:flex; align-items:center; gap:8px; margin:10px 0;">
+          <input id="inv-vat" type="checkbox" style="width:auto;">
+          <span>إضافة ضريبة القيمة المضافة (VAT 14%)</span>
+        </label>
+        <label>طريقة الدفع</label>
+        <select id="inv-pay-method">
+          <option value="cash">كاش</option>
+          <option value="visa">فيزا</option>
+          <option value="insta pay">انستا باي</option>
+          <option value="wallet">محفظة</option>
+        </select>
+        <label>المدفوع</label>
+        <input id="inv-paid" type="number" value="0" min="0">
+        <div class="cart-total">
+          <span id="inv-vat-line" style="color:var(--muted); font-size:13px; display:none;"></span>
+          الإجمالي: <b id="inv-total">0</b> ج.م<br>
+          <span id="inv-remaining" style="color:var(--muted); font-size:13px;"></span>
+        </div>
+        <button class="btn" style="width:100%; margin-top:16px;" id="inv-save">إدخال الفاتورة</button>
+      </div>
+
+      <div class="panel">
+        <div class="top-actions">
+          <h2 style="margin:0;">المنتجات</h2>
+          <input class="search-bar" id="product-search" placeholder="بحث عن منتج...">
+        </div>
+        <div class="products-grid" id="products-grid"></div>
+        <table style="margin-top:18px;">
+          <thead><tr><th>المنتج</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th><th></th></tr></thead>
+          <tbody id="cart-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ الفواتير ============ -->
+  <section class="view" id="view-invoices">
+    <div class="top-actions">
+      <h2 style="margin:0;">قائمة الفواتير</h2>
+      <input class="search-bar" id="invoices-search" placeholder="ابحث برقم الهاتف أو كود الفاتورة...">
+    </div>
+    <div class="panel" style="margin-bottom:14px; display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap;">
+      <div>
+        <label style="margin:0 0 6px;">الكاشير فاتح الشفت</label>
+        <div style="display:flex; gap:12px; align-items:center; min-height:30px;">
+          <label style="display:flex; align-items:center; gap:4px; font-weight:400; cursor:pointer;">
+            <input type="radio" name="invoices-cashier-filter" id="invoices-cashier-me" value="me"> أنا
+          </label>
+          <label style="display:flex; align-items:center; gap:4px; font-weight:400; cursor:pointer;">
+            <input type="radio" name="invoices-cashier-filter" id="invoices-cashier-all" value="all" checked> الكل
+          </label>
+        </div>
+      </div>
+      <div>
+        <label style="margin:0 0 6px;">من تاريخ</label>
+        <input type="date" id="invoices-start-date">
+      </div>
+      <div>
+        <label style="margin:0 0 6px;">إلى تاريخ</label>
+        <input type="date" id="invoices-end-date">
+      </div>
+      <button class="btn secondary" id="invoices-today-btn">فواتير اليوم</button>
+      <button class="btn secondary" id="invoices-clear-dates-btn">كل الفواتير</button>
+    </div>
+    <div class="panel">
+      <table>
+        <thead>
+          <tr><th>الكود</th><th>العميل</th><th>الهاتف</th><th>الفرع</th><th>الكاشير</th><th>الإجمالي</th><th>المتبقي</th><th>الحالة</th><th>تم التسليم</th><th>المزامنة</th><th>التاريخ</th><th>تحكم</th></tr>
+        </thead>
+        <tbody id="invoices-body"></tbody>
+      </table>
+      <div class="empty" id="invoices-empty" style="display:none;">لا توجد فواتير بعد</div>
+    </div>
+  </section>
+
+  <!-- ============ المنتجات ============ -->
+  <section class="view" id="view-products">
+    <div class="top-actions">
+      <h2 style="margin:0;">إدارة المنتجات</h2>
+      <div style="display:flex; gap:8px;">
+        <button class="btn secondary" id="import-products-btn">استيراد قائمة المنتجات القياسية</button>
+        <button class="btn" id="add-product-btn">+ منتج جديد</button>
+      </div>
+    </div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>المنتج</th><th>الكود</th><th>السعر</th><th>الفرع</th><th>المخزون</th><th></th></tr></thead>
+        <tbody id="products-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ الفروع ============ -->
+  <section class="view" id="view-branches">
+    <div class="top-actions">
+      <h2 style="margin:0;">إدارة الفروع</h2>
+      <button class="btn" id="add-branch-btn">+ فرع جديد</button>
+    </div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>اسم الفرع</th><th>العنوان</th><th></th></tr></thead>
+        <tbody id="branches-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ المصروفات ============ -->
+  <section class="view" id="view-expenses">
+    <div class="top-actions">
+      <h2 style="margin:0;">المصروفات</h2>
+      <button class="btn" id="add-expense-btn">+ مصروف جديد</button>
+    </div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>الوصف</th><th>الفئة</th><th>المبلغ</th><th>الفرع</th><th>بواسطة</th><th>التاريخ</th><th></th></tr></thead>
+        <tbody id="expenses-body"></tbody>
+      </table>
+      <div class="empty" id="expenses-empty" style="display:none;">لا توجد مصروفات مسجلة</div>
+    </div>
+  </section>
+
+  <!-- ============ السلف ============ -->
+  <section class="view" id="view-advances">
+    <div class="top-actions">
+      <h2 style="margin:0;">السلف</h2>
+      <button class="btn" id="add-advance-btn">+ سلفة جديدة</button>
+    </div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>اسم الموظف</th><th>المبلغ</th><th>ملاحظات</th><th>الفرع</th><th>بواسطة</th><th>التاريخ</th><th>الحالة</th><th></th></tr></thead>
+        <tbody id="advances-body"></tbody>
+      </table>
+      <div class="empty" id="advances-empty" style="display:none;">لا توجد سلف مسجلة</div>
+    </div>
+  </section>
+
+  <!-- ============ الموظفين ============ -->
+  <section class="view" id="view-users">
+    <div class="top-actions">
+      <h2 style="margin:0;">حسابات الموظفين</h2>
+      <button class="btn" id="add-user-btn">+ موظف جديد</button>
+    </div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>الاسم</th><th>اسم الدخول</th><th>الصلاحية</th><th>الفرع</th><th></th></tr></thead>
+        <tbody id="users-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ الرواتب والسلف (للمدير فقط) ============ -->
+  <section class="view" id="view-salaries">
+    <div class="top-actions">
+      <h2 style="margin:0;">الرواتب والسلف</h2>
+    </div>
+    <p style="color:var(--muted); font-size:13px; margin-top:-8px;">
+      الخانة دي مخصصة للمدير بس، ومش بتظهر للكاشير خالص. بتوضح صافي مستحقات كل موظف بعد خصم أي سلف
+      لسه ما اتخصمتش من راتبه. لما تصرف الراتب، دوس "تسوية وصرف الراتب" وهيتم اعتبار كل السلف
+      المستحقة دلوقتي مخصومة (مش هتظهر تاني في حساب الشهر الجاي).
+    </p>
+    <div class="panel">
+      <table>
+        <thead><tr><th>الموظف</th><th>الراتب الأساسي</th><th>سلف مستحقة (لسه)</th><th>صافي المستحق</th><th></th></tr></thead>
+        <tbody id="salaries-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ تقفيل الشفتات والتقارير (للمدير فقط) ============ -->
+  <section class="view" id="view-reports">
+    <div class="top-actions">
+      <h2 style="margin:0;">تقفيل الشفتات والتقارير</h2>
+    </div>
+    <div class="panel" style="margin-bottom:20px;">
+      <div style="display:flex; gap:14px; align-items:end; flex-wrap:wrap;">
+        <div>
+          <label>الفرع</label>
+          <select id="rep-branch" style="min-width:180px;"></select>
+        </div>
+        <div>
+          <label>من تاريخ</label>
+          <input id="rep-start" type="date">
+        </div>
+        <div>
+          <label>إلى تاريخ</label>
+          <input id="rep-end" type="date">
+        </div>
+        <button class="btn secondary" id="rep-today-btn">اليوم</button>
+        <button class="btn secondary" id="rep-yesterday-btn">أمس</button>
+        <button class="btn secondary" id="rep-month-btn">الشهر ده</button>
+        <button class="btn" id="rep-run-btn">عرض التقرير</button>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px;">
+      <h3 style="margin-top:0;">إجمالي كل فرع في الفترة المختارة</h3>
+      <table>
+        <thead><tr>
+          <th>الفرع</th><th>عدد الشفتات</th><th>إجمالي المبيعات</th><th>إجمالي المصروفات</th><th>إجمالي السلف</th>
+          <th>كاش</th><th>فيزا</th><th>انستا باي</th><th>محفظة</th><th>صافي الكاش المتوقع بالدرج</th>
+        </tr></thead>
+        <tbody id="rep-branch-body"></tbody>
+      </table>
+      <div id="rep-grand-total" style="margin-top:14px; font-weight:700;"></div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0;">تفاصيل الشفتات</h3>
+      <table>
+        <thead><tr>
+          <th>وقت الفتح</th><th>وقت الإغلاق</th><th>الفرع</th><th>الكاشير</th><th>الحالة</th>
+          <th>المبيعات</th><th>المصروفات</th><th>السلف</th><th>صافي الكاش المتوقع بالدرج</th><th>الفرق (عجز/زيادة)</th><th></th>
+        </tr></thead>
+        <tbody id="rep-shifts-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ الإعدادات ============ -->
+  <section class="view" id="view-settings">
+    <div class="panel" style="max-width:520px;">
+      <h2>إعدادات الاتصال بالسيرفر</h2>
+      <p style="color:var(--muted); font-size:13px; line-height:1.6;">
+        <b>لو بتفتح النظام من رابط الموقع مباشرة (الوضع العادي)</b>: سيب الخانة دي فاضية
+        وامسح أي قيمة موجودة — النظام هيكلم نفس السيرفر اللي فتحت منه الصفحة تلقائياً،
+        مفيش أي إعداد إضافي مطلوب.<br><br>
+        الخانة دي بس للحالات الخاصة (زي تطبيق الموبايل، أو جهاز عايز يتصل بسيرفر تاني
+        غير اللي فاتح منه الصفحة). مثال: <code>http://192.168.1.10:4000</code>
+      </p>
+      <label>عنوان السيرفر (سيبها فاضية في الوضع العادي)</label>
+      <input id="settings-api-url" placeholder="فاضي = نفس عنوان الموقع الحالي">
+      <button class="btn" style="width:100%; margin-top:14px;" id="settings-save-btn">حفظ وإعادة التشغيل</button>
+      <div style="margin-top:20px; font-size:13px; color:var(--muted);">
+        حالة الاتصال الحالية: <span id="settings-sync-status">-</span>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Modal لإضافة/تعديل منتج -->
+<div class="modal-bg" id="product-modal">
+  <div class="modal">
+    <h3 id="product-modal-title">منتج جديد</h3>
+    <label>اسم المنتج</label><input id="pm-name">
+    <label>الكود</label><input id="pm-code">
+    <label>السعر</label><input id="pm-price" type="number">
+    <label>الفرع</label><select id="pm-branch"></select>
+    <label>المخزون</label><input id="pm-stock" type="number" value="0">
+    <div style="display:flex; gap:8px; margin-top:18px;">
+      <button class="btn" id="pm-save" style="flex:1;">حفظ</button>
+      <button class="btn secondary" id="pm-cancel" style="flex:1;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal لإضافة/تعديل فرع -->
+<div class="modal-bg" id="branch-modal">
+  <div class="modal">
+    <h3 id="branch-modal-title">فرع جديد</h3>
+    <label>اسم الفرع</label><input id="bm-name">
+    <label>العنوان</label><input id="bm-address">
+    <div style="display:flex; gap:8px; margin-top:18px;">
+      <button class="btn" id="bm-save" style="flex:1;">حفظ</button>
+      <button class="btn secondary" id="bm-cancel" style="flex:1;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- شاشة تسجيل الدخول -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <div class="logo">Kodak<span style="color:var(--red);">Pixel</span></div>
+    <p>سجّل دخولك للمتابعة</p>
+    <div id="startup-error" style="display:none; background:#fdecea; color:var(--red); font-size:12px; padding:10px; border-radius:8px; text-align:right; margin-bottom:14px;"></div>
+    <label style="text-align:right;">اسم الدخول</label>
+    <input id="login-username" placeholder="username">
+    <label style="text-align:right;">كلمة المرور</label>
+    <input id="login-password" type="password" placeholder="••••••">
+    <button class="btn" style="width:100%; margin-top:18px;" id="login-btn">دخول</button>
+    <p id="login-error" style="color:var(--red); font-size:13px; display:none;">بيانات الدخول غير صحيحة</p>
+  </div>
+</div>
+
+<!-- Modal لإضافة مصروف -->
+<div class="modal-bg" id="expense-modal">
+  <div class="modal">
+    <h3>مصروف جديد</h3>
+    <label>الوصف</label><input id="em-description" placeholder="مثال: فاتورة كهرباء">
+    <label>الفئة</label>
+    <select id="em-category">
+      <option value="تشغيل">تشغيل</option>
+      <option value="صيانة">صيانة</option>
+      <option value="مستلزمات">مستلزمات</option>
+      <option value="أخرى">أخرى</option>
+    </select>
+    <label>المبلغ</label><input id="em-amount" type="number">
+    <div style="display:flex; gap:8px; margin-top:18px;">
+      <button class="btn" id="em-save" style="flex:1;">حفظ</button>
+      <button class="btn secondary" id="em-cancel" style="flex:1;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal لإضافة سلفة -->
+<div class="modal-bg" id="advance-modal">
+  <div class="modal">
+    <h3>سلفة جديدة</h3>
+    <label>الموظف المستلف</label>
+    <select id="am-employee-select"></select>
+    <label>المبلغ</label><input id="am-amount" type="number">
+    <label>ملاحظات</label><input id="am-note">
+    <label>كلمة مرور الموظف المستلف <span style="color:var(--muted); font-weight:400;">(للتأكيد)</span></label>
+    <input id="am-employee-password" type="password">
+    <p id="am-error" style="color:var(--red); font-size:13px; display:none;">كلمة المرور غير صحيحة</p>
+    <div style="display:flex; gap:8px; margin-top:18px;">
+      <button class="btn" id="am-save" style="flex:1;">حفظ</button>
+      <button class="btn secondary" id="am-cancel" style="flex:1;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal لإضافة/تعديل موظف -->
+<div class="modal-bg" id="user-modal">
+  <div class="modal">
+    <h3 id="user-modal-title">موظف جديد</h3>
+    <label>الاسم</label><input id="um-name">
+    <label>اسم الدخول</label><input id="um-username">
+    <label>كلمة المرور <span style="color:var(--muted); font-weight:400;">(سيبها فاضية لو مش هتغيرها)</span></label>
+    <input id="um-password" type="password">
+    <label>الصلاحية</label>
+    <select id="um-role">
+      <option value="cashier">كاشير</option>
+      <option value="admin">مدير</option>
+    </select>
+    <label>الفرع</label><select id="um-branch"></select>
+    <label>الراتب الشهري الأساسي <span style="color:var(--muted); font-weight:400;">(اختياري، لحساب الرواتب)</span></label>
+    <input id="um-salary" type="number" placeholder="مثال: 4000">
+    <div style="display:flex; gap:8px; margin-top:18px;">
+      <button class="btn" id="um-save" style="flex:1;">حفظ</button>
+      <button class="btn secondary" id="um-cancel" style="flex:1;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal تأكيد إغلاق الشفت (كاش الدرج + الباسورد) -->
+<div class="modal-bg" id="close-shift-modal">
+  <div class="modal">
+    <h3>إغلاق الشفت</h3>
+    <label>الكاش الموجود فعلياً في الدرج</label>
+    <input id="cs-actual-cash" type="number" placeholder="مثال: 1500">
+    <label>كلمة مرور الكاشير اللي فاتح الشفت</label>
+    <input id="cs-password" type="password">
+    <p id="cs-error" style="color:var(--red); font-size:13px; display:none;">كلمة المرور غير صحيحة</p>
+    <div style="display:flex; gap:8px; margin-top:18px;">
+      <button class="btn" id="cs-confirm" style="flex:1;">تأكيد الإغلاق</button>
+      <button class="btn secondary" id="cs-cancel" style="flex:1;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal ملخص إغلاق الشفت -->
+<div class="modal-bg summary-modal" id="shift-summary-modal">
+  <div class="modal">
+    <h3>ملخص الشفت</h3>
+    <div id="shift-summary-body"></div>
+    <div style="display:flex; gap:8px; margin-top:18px;">
+      <button class="btn" id="ssm-print" style="flex:1;">طباعة</button>
+      <button class="btn secondary" id="ssm-close" style="flex:1;">إغلاق وتسجيل الخروج</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal عرض تفاصيل الفاتورة -->
+<div class="modal-bg wide-modal" id="shift-details-modal">
+  <div class="modal">
+    <h3 id="sdm-title">تفاصيل الشفت</h3>
+    <div id="sdm-info" style="color:var(--muted); font-size:13px; margin-bottom:6px;"></div>
+
+    <div class="admin-close-box" id="sdm-close-shift-box" style="display:none;">
+      <div style="font-weight:700;">إغلاق شفت الموظف (كمدير)</div>
+      <label>الكاش الموجود فعلياً في الدرج</label>
+      <input id="sdm-actual-cash" type="number" placeholder="مثال: 1500">
+      <button class="btn" id="sdm-close-shift-btn">تأكيد إغلاق الشفت</button>
+    </div>
+
+    <h4>الملخص المالي</h4>
+    <div id="sdm-summary"></div>
+
+    <h4>الفواتير (الأوردرات) في الشفت ده</h4>
+    <table>
+      <thead><tr><th>رقم</th><th>العميل</th><th>الإجمالي</th><th>المدفوع</th><th>المتبقي</th><th>طريقة الدفع</th><th>الحالة</th><th></th></tr></thead>
+      <tbody id="sdm-invoices-body"></tbody>
+    </table>
+
+    <h4>المصروفات في الشفت ده</h4>
+    <table>
+      <thead><tr><th>الوصف</th><th>الفئة</th><th>المبلغ</th><th></th></tr></thead>
+      <tbody id="sdm-expenses-body"></tbody>
+    </table>
+
+    <h4>السلف في الشفت ده</h4>
+    <table>
+      <thead><tr><th>الموظف</th><th>المبلغ</th><th>ملاحظات</th><th></th></tr></thead>
+      <tbody id="sdm-advances-body"></tbody>
+    </table>
+
+    <button class="btn secondary" id="sdm-close" style="width:100%; margin-top:20px;">إغلاق</button>
+  </div>
+</div>
+
+<div class="modal-bg summary-modal" id="invoice-details-modal">
+  <div class="modal" style="width:480px;">
+    <h3 id="invoice-details-title">تفاصيل الفاتورة</h3>
+    <div id="invoice-details-body"></div>
+    <div style="display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;">
+      <button class="btn" id="idm-print-detailed" style="flex:1; min-width:140px;">طباعة رصيد مفصل</button>
+      <button class="btn" id="idm-print-amount" style="flex:1; min-width:140px;">طباعة رصيد الأوردر</button>
+      <button class="btn" id="idm-print-sticker" style="flex:1; min-width:100px;">استيكر</button>
+    </div>
+    <button class="btn secondary" id="idm-close" style="width:100%; margin-top:10px;">إغلاق</button>
+  </div>
+</div>
+
+<!-- Modal إضافة تحصيل من المبلغ المتبقي -->
+<div class="modal-bg" id="add-payment-modal">
+  <div class="modal">
+    <h3>إضافة المال</h3>
+    <div class="summary-row"><span>إجمالي الفاتورة</span><span id="apm-total">0.00 ج.م</span></div>
+    <div class="summary-row"><span>المدفوع سابقاً</span><span id="apm-paid-before">0.00 ج.م</span></div>
+    <div class="summary-row total"><span>المتبقي</span><span id="apm-remaining-before">0.00 ج.م</span></div>
+    <label>المبلغ المُحصّل دلوقتي</label>
+    <input id="apm-amount" type="number">
+    <label>طريقة الدفع</label>
+    <select id="apm-pay-method">
+      <option value="cash">كاش</option>
+      <option value="visa">فيزا</option>
+      <option value="insta pay">انستا باي</option>
+      <option value="wallet">محفظة</option>
+    </select>
+    <p id="apm-error" style="color:var(--red); font-size:13px; display:none;"></p>
+    <div style="display:flex; gap:8px; margin-top:18px;">
+      <button class="btn" id="apm-save" style="flex:1;">تأكيد التحصيل</button>
+      <button class="btn secondary" id="apm-cancel" style="flex:1;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal تعديل الفاتورة (للمدير فقط) -->
+<div class="modal-bg" id="invoice-edit-modal">
+  <div class="modal" style="width:400px;">
+    <h3>تعديل الفاتورة</h3>
+    <label>اسم العميل</label><input id="iem-customer-name">
+    <label>رقم الهاتف</label><input id="iem-customer-phone">
+    <label>الخصم %</label><input id="iem-discount" type="number" min="0" max="100">
+    <label class="checkbox-label" style="display:flex; align-items:center; gap:8px; margin:10px 0;">
+      <input id="iem-vat" type="checkbox" style="width:auto;">
+      <span>ضريبة القيمة المضافة (VAT 14%)</span>
+    </label>
+    <label>طريقة الدفع</label>
+    <select id="iem-pay-method">
+      <option value="cash">كاش</option>
+      <option value="visa">فيزا</option>
+      <option value="insta pay">انستا باي</option>
+      <option value="wallet">محفظة</option>
+    </select>
+    <label>المدفوع</label><input id="iem-paid" type="number">
+    <label>حالة التسليم</label>
+    <select id="iem-status">
+      <option value="not Delivered">لم يتم التسليم</option>
+      <option value="delivered">تم التسليم</option>
+    </select>
+    <p style="font-size:12px; color:var(--muted);">ملحوظة: أصناف الفاتورة نفسها مش قابلة للتعديل هنا، بس بيانات العميل والدفع والخصم.</p>
+    <div style="display:flex; gap:8px; margin-top:12px;">
+      <button class="btn" id="iem-save" style="flex:1;">حفظ التعديل</button>
+      <button class="btn secondary" id="iem-cancel" style="flex:1;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// إعدادات عامة
+// ============================================================
+// غيّر ده بس لو السيرفر شغال في مكان تاني عن مكان الواجهة نفسها (مثلاً تطبيق
+// موبايل بيتصل بسيرفر بعيد). لو مفيش قيمة محفوظة، بنستخدم نفس عنوان الصفحة
+// الحالية تلقائياً (يعني لو فتحت http://mydomain.com هيكلم http://mydomain.com
+// من غير أي إعداد إضافي مطلوب منك — ده الوضع الطبيعي لما السيرفر والواجهة
+// منشورين مع بعض كموقع واحد).
+const API_URL = localStorage.getItem('kp_api_url') || '';
+// مفتاح تخزين توكن JWT اللي بيجيه من /api/auth/login وقت الدخول أونلاين،
+// وبيتبعت بعد كده مع كل طلب مزامنة كـ Authorization: Bearer <TOKEN>.
+const AUTH_TOKEN_KEY = 'kp_auth_token';
+
+function uid(){ return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8); }
+function now(){ return Date.now(); }
+
+// إشعار صغير بيظهر ويختفي لوحده (مش زي alert بيوقف الشاشة وينتظر ضغطة تأكيد)،
+// بنستخدمه بعد حفظ الفاتورة عشان الكاشير يتأكد إن الحفظ حصل من غير ما نفتحله
+// أي شاشة تانية فوق شاشته وهو لسه بيبيع.
+let toastTimer = null;
+function showToast(message, type){
+  const el = document.getElementById('app-toast');
+  el.textContent = message;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.classList.remove('show'); }, 2500);
+}
+
+// حساب مالي آمن: بنحول أي مبلغ لقروش (أعداد صحيحة) قبل الجمع عشان نتفادى
+// أخطاء الفاصلة العشرية (زي 0.1+0.2 !== 0.3) اللي بتظهر مع كتر عمليات الجمع.
+function toCents(n){ return Math.round((parseFloat(n)||0) * 100); }
+function centsToNumber(c){ return c / 100; }
+function safeSumFinancials(items, getVal){
+  const totalInCents = items.reduce((sum, item) => sum + toCents(getVal(item)), 0);
+  return centsToNumber(totalInCents);
+}
+
+// حساب أرقام الشفت المالية بشكل موحّد، سواء وقت القفل أو في التقارير.
+// المهم هنا: تحصيل الكاش بيتحسب من سجل "payments" (كل عملية تحصيل فعلية بتاريخها
+// ومعاها الشفت اللي اتحصّلت فيه)، مش من مجرد قراءة حقل "المدفوع" في الفاتورة.
+// ده بيحل مشكلة إن فاتورة اتعملت في شفت اتقفل بالفعل، وبعدين حد آخر حصّل باقي
+// المبلغ في شفت تاني (يمكن يوم تاني) - الفلوس دي المفروض تتحسب على الشفت اللي
+// اتحصّلت فيه فعلياً (علشان تتراجع مع الكاش الموجود في الدرج ساعتها)، مش تضيع
+// أو تتحسب غلط على الشفت الأول اللي كان لسه مقفول.
+async function computeShiftFinancials(shiftId){
+  const allInvoices = await idbAll('invoices');
+  const invoices = allInvoices.filter(i=>i.shift_id===shiftId);
+  const expenses = (await idbAll('expenses')).filter(e=>e.shift_id===shiftId);
+  const advances = (await idbAll('advances')).filter(a=>a.shift_id===shiftId);
+  const payments = (await idbAll('payments')).filter(p=>p.shift_id===shiftId);
+
+  const byMethod = {cash:0, visa:0, 'insta pay':0, wallet:0};
+  for(const method of Object.keys(byMethod)){
+    byMethod[method] = safeSumFinancials(payments.filter(p=>p.method===method), p=>p.amount);
+  }
+  const totalSales = safeSumFinancials(invoices, i=>i.total_cost);
+  const totalVat = safeSumFinancials(invoices, i=>i.vat_amount||0);
+  const totalCollected = safeSumFinancials(payments, p=>p.amount);
+  // تحصيلات في الشفت ده لكن على فواتير كانت اتعملت في شفت/يوم تاني (مهم للمراجعة)
+  const collectedOnOtherShiftsInvoices = safeSumFinancials(
+    payments.filter(p=>{
+      const inv = allInvoices.find(i=>i.id===p.invoice_id);
+      return inv && inv.shift_id !== shiftId;
+    }), p=>p.amount
+  );
+  const totalExpenses = safeSumFinancials(expenses, e=>e.amount);
+  const totalAdvances = safeSumFinancials(advances, a=>a.amount);
+  const netCash = centsToNumber(toCents(byMethod.cash) - toCents(totalExpenses) - toCents(totalAdvances));
+
+  return {
+    invoicesCount: invoices.length, totalSales, totalVat, totalPaid: totalCollected, byMethod,
+    collectedOnOtherShiftsInvoices, totalExpenses, totalAdvances, netCash
+  };
+}
+
+async function hashPassword(plain){
+  const enc = new TextEncoder().encode(plain);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// ============================================================
+// طبقة التخزين المحلي (IndexedDB) - بتشتغل حتى من غير إنترنت
+// ============================================================
+const DB_NAME = 'kodakPixelDB';
+const STORES = ['branches','products','invoices','users','shifts','expenses','advances','payments'];
+let dbInstance = null;
+
+function openDB(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(DB_NAME, 2);
+    req.onupgradeneeded = (e)=>{
+      const db = e.target.result;
+      STORES.forEach(s=>{
+        if(!db.objectStoreNames.contains(s)) db.createObjectStore(s, {keyPath:'id'});
+      });
+    };
+    req.onsuccess = ()=>{ dbInstance = req.result; resolve(dbInstance); };
+    req.onerror = ()=>reject(req.error);
+  });
+}
+
+function idbAll(store){
+  return new Promise((resolve,reject)=>{
+    const tx = dbInstance.transaction(store,'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = ()=>resolve(req.result.filter(r=>!r.deleted));
+    req.onerror = ()=>reject(req.error);
+  });
+}
+function idbAllRaw(store){
+  return new Promise((resolve,reject)=>{
+    const tx = dbInstance.transaction(store,'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+function idbPut(store, record){
+  return new Promise((resolve,reject)=>{
+    const tx = dbInstance.transaction(store,'readwrite');
+    tx.objectStore(store).put(record);
+    tx.oncomplete = ()=>resolve(record);
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+function idbPutMany(store, records){
+  return new Promise((resolve,reject)=>{
+    const tx = dbInstance.transaction(store,'readwrite');
+    const os = tx.objectStore(store);
+    records.forEach(r=>os.put(r));
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+
+// ============================================================
+// المزامنة مع السيرفر
+// ============================================================
+let cart = [];
+let allProducts = [];
+let allBranches = [];
+let allShiftsCache = [];
+let currentUser = null;
+let currentShift = null;
+let invoicesDateFilterTouched = false;
+
+// بيبني هيدرز الطلب لأي نداء للسيرفر: بيضيف Authorization: Bearer <token>
+// تلقائياً لو فيه توكن محفوظ من تسجيل الدخول الأونلاين، وإلا بيبعت من غير ما
+// يضيفه (النظام بيفضل شغال زي ما هو من غير توكن، توافقاً مع الأجهزة الأقدم).
+function buildAuthHeaders(){
+  const headers = {'Content-Type':'application/json'};
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  if(token) headers['Authorization'] = 'Bearer ' + token;
+  return headers;
+}
+
+async function syncNow(){
+  setSyncStatus('جاري المزامنة...', 'pending');
+  try{
+    const since = Number(localStorage.getItem('kp_last_sync') || 0);
+    const payload = {
+      since,
+      branches: await idbAllRaw('branches'),
+      products: await idbAllRaw('products'),
+      invoices: await idbAllRaw('invoices'),
+      users: await idbAllRaw('users'),
+      shifts: await idbAllRaw('shifts'),
+      expenses: await idbAllRaw('expenses'),
+      advances: await idbAllRaw('advances'),
+      payments: await idbAllRaw('payments'),
+    };
+    const res = await fetch(API_URL + '/api/sync', {
+      method:'POST',
+      headers: buildAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok){
+      if(res.status===401) throw new Error('auth_required');
+      throw new Error('sync failed');
+    }
+    const data = await res.json();
+    for(const t of ['branches','products','invoices','users','shifts','expenses','advances','payments']){
+      if(data[t]?.length) await idbPutMany(t, data[t]);
+    }
+
+    // علم "synced" صريح بدل مقارنة التوقيت (بيتحل مشكلة فروق ساعة السيرفر/الجهاز):
+    // بعد رجوع المزامنة بنجاح، كل فاتورة محلية دلوقتي متطابقة مع السيرفر (إما إحنا بعتناها،
+    // أو استلمنا نسخة السيرفر الأحدث)، فبنعلّمها كلها كمتزامنة.
+    const localInvoices = await idbAllRaw('invoices');
+    localInvoices.forEach(inv => { inv.synced = 1; });
+    await idbPutMany('invoices', localInvoices);
+
+    if(data.skippedUsers && data.skippedUsers.length && currentUser?.role==='admin'){
+      alert('تنبيه: في أسماء دخول متكررة بين الفروع اتجاهلت أثناء المزامنة:\n' +
+        data.skippedUsers.map(u=>`- ${u.username}`).join('\n') +
+        '\nروح شاشة "الموظفين" وغيّر الاسم المكرر.');
+    }
+
+    localStorage.setItem('kp_last_sync', data.serverTime);
+    setSyncStatus('تمت المزامنة الآن', 'online');
+    await refreshAll();
+  }catch(err){
+    console.warn('sync error', err);
+    if(err.message==='auth_required'){
+      setSyncStatus('محتاج تسجّل خروج ودخول تاني عشان تتزامن', '');
+    } else {
+      setSyncStatus('أوفلاين - لم تتم المزامنة', '');
+    }
+  }
+}
+
+function setSyncStatus(text, cls){
+  document.getElementById('syncLabel').textContent = text;
+  const dot = document.getElementById('netDot');
+  dot.className = 'dot' + (cls ? ' '+cls : '');
+}
+
+window.addEventListener('online', syncNow);
+window.addEventListener('offline', ()=>setSyncStatus('أوفلاين - العمل محلي', ''));
+
+// ============================================================
+// عرض/إخفاء الصفحات
+// ============================================================
+document.querySelectorAll('nav button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(btn.classList.contains('admin-only') && currentUser?.role!=='admin') return;
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+btn.dataset.view).classList.add('active');
+    if(btn.dataset.view==='settings'){
+      document.getElementById('settings-api-url').value = API_URL;
+      document.getElementById('settings-sync-status').textContent = document.getElementById('syncLabel').textContent;
+    }
+  });
+});
+
+document.getElementById('settings-save-btn').onclick = ()=>{
+  const val = document.getElementById('settings-api-url').value.trim();
+  if(val){
+    localStorage.setItem('kp_api_url', val.replace(/\/+$/, '')); // نشيل أي / زيادة في الآخر
+  } else {
+    localStorage.removeItem('kp_api_url'); // فاضي = ارجع للوضع الافتراضي (نفس عنوان الموقع الحالي)
+  }
+  location.reload();
+};
+
+// ============================================================
+// الفروع
+// ============================================================
+async function refreshBranches(){
+  allBranches = await idbAll('branches');
+  const selects = [document.getElementById('inv-branch'), document.getElementById('pm-branch'), document.getElementById('um-branch')];
+  selects.forEach(sel=>{
+    sel.innerHTML = allBranches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('') || '<option value="">لا توجد فروع</option>';
+  });
+  applyBranchLock();
+  const tbody = document.getElementById('branches-body');
+  tbody.innerHTML = allBranches.map(b=>`
+    <tr>
+      <td>${b.name}</td>
+      <td>${b.address||'-'}</td>
+      <td>
+        <button class="btn small secondary" onclick="editBranch('${b.id}')">تعديل</button>
+        <button class="btn small danger" onclick="deleteBranch('${b.id}')">حذف</button>
+      </td>
+    </tr>`).join('');
+}
+
+// الكاشير بيشتغل دايماً على الفرع اللي اتسجل بيه من البداية، من غير ما يقدر يغيّره.
+// المدير بس هو اللي يقدر يختار أي فرع (لإنه بيشرف على أكتر من فرع).
+function applyBranchLock(){
+  const branchSelect = document.getElementById('inv-branch');
+  if(!currentUser){ branchSelect.disabled = false; return; }
+  if(currentUser.role === 'admin'){
+    branchSelect.disabled = false;
+    return;
+  }
+  if(currentUser.branch_id){
+    branchSelect.value = currentUser.branch_id;
+  }
+  branchSelect.disabled = true;
+}
+
+document.getElementById('add-branch-btn').onclick = ()=>openBranchModal();
+document.getElementById('bm-cancel').onclick = ()=>document.getElementById('branch-modal').classList.remove('active');
+
+let editingBranchId = null;
+function openBranchModal(id){
+  editingBranchId = id || null;
+  const b = id ? allBranches.find(x=>x.id===id) : null;
+  document.getElementById('branch-modal-title').textContent = id ? 'تعديل فرع' : 'فرع جديد';
+  document.getElementById('bm-name').value = b?.name || '';
+  document.getElementById('bm-address').value = b?.address || '';
+  document.getElementById('branch-modal').classList.add('active');
+}
+window.editBranch = (id)=>openBranchModal(id);
+window.deleteBranch = async (id)=>{
+  if(currentUser.role!=='admin') return; // حماية إضافية، الزرار أصلاً مش ظاهر لغير المدير
+  const b = allBranches.find(x=>x.id===id);
+  b.deleted = 1; b.updated_at = now();
+  await idbPut('branches', b);
+  await refreshBranches();
+};
+
+document.getElementById('bm-save').onclick = async ()=>{
+  const name = document.getElementById('bm-name').value.trim();
+  if(!name) return alert('اكتب اسم الفرع');
+  const record = {
+    id: editingBranchId || uid(),
+    name,
+    address: document.getElementById('bm-address').value.trim(),
+    updated_at: now(),
+    deleted: 0
+  };
+  await idbPut('branches', record);
+  document.getElementById('branch-modal').classList.remove('active');
+  await refreshBranches();
+};
+
+// ============================================================
+// المنتجات
+// ============================================================
+async function refreshProducts(){
+  allProducts = await idbAll('products');
+  renderProductsGrid();
+  const tbody = document.getElementById('products-body');
+  tbody.innerHTML = allProducts.map(p=>`
+    <tr>
+      <td>${p.name}</td>
+      <td>${p.code||'-'}</td>
+      <td>${p.price} ج.م</td>
+      <td>${branchName(p.branch_id)}</td>
+      <td>${p.stock_qty ?? 0}</td>
+      <td>
+        <button class="btn small secondary" onclick="editProduct('${p.id}')">تعديل</button>
+        <button class="btn small danger" onclick="deleteProduct('${p.id}')">حذف</button>
+      </td>
+    </tr>`).join('');
+}
+function branchName(id){ return allBranches.find(b=>b.id===id)?.name || '-'; }
+
+// بيرجع اسم الكاشير اللي فاتح الشفت المرتبط بالفاتورة (مش بالضرورة نفس created_by
+// لو حصل تعديل على الفاتورة بعدين)، وده مفيد لو أكتر من كاشير فاتحين شفتاتهم في نفس الوقت.
+async function refreshShiftsCache(){
+  allShiftsCache = await idbAll('shifts');
+}
+function shiftCashierName(shiftId){
+  if(!shiftId) return '-';
+  return allShiftsCache.find(s=>s.id===shiftId)?.user_name || '-';
+}
+function shiftCashierUserId(shiftId){
+  if(!shiftId) return null;
+  return allShiftsCache.find(s=>s.id===shiftId)?.user_id || null;
+}
+
+function renderProductsGrid(filter){
+  const grid = document.getElementById('products-grid');
+  const list = filter ? allProducts.filter(p=>p.name.includes(filter)) : allProducts;
+  grid.innerHTML = list.map(p=>`
+    <div class="product-card" onclick="addToCart('${p.id}')">
+      <div class="p-name">${p.name}</div>
+      <div class="p-price">${p.price} ج.م</div>
+    </div>`).join('') || '<div class="empty">لا توجد منتجات</div>';
+}
+document.getElementById('product-search').addEventListener('input', e=>renderProductsGrid(e.target.value));
+
+// ============================================================
+// قائمة المنتجات القياسية (من قائمة أسعار الاستوديو)
+// ============================================================
+const STANDARD_PRODUCTS = [
+  ['20x30 print',75],['20x25 print',50],['15x21 wood',120],['15x21 print',25],['13x18 print',20],['10x15 print',15],
+  ['30x40wood',230],['30x40 print',120],['30x40 fs',200],['30x40 bold',270],['3.5x4.5',90],['20x30wood',180],
+  ['4x6 pic 20',130],['4x6 pic 12',90],['40x50 wood',290],['40x50 print',175],['40x50 fs',280],['40x50 bold',340],
+  ['50x70 print',250],['50x70 fs',375],['50x70 bold',430],['50x60 wood',330],['50x60 print',200],['4x6 pic 8',80],
+  ['Frame Small 10x15 bold',90],['Frame Small 10x15 fs',75],['5x8 pics 6',80],['5x7 canda',120],['5x5 pic 6',90],['50x70 wood',370],
+  ['Frame Small 20x25fs',150],['Frame Small 20x25 bold',180],['Frame Small 15x21 fs',100],['Frame Small 15x21 bold',135],['Frame Small 13x18 fs',80],['Frame Small 13x18 bold',110],
+  ['card',75],['Video Transfers HD',210],['Session 7 Photo (Soft + print)',525],['Kodak services',1],['Frame Small 20x30 fs',150],['Frame Small 20x30 bold',180],
+  ['pic 10x15 print with soft',75],['edit Professional',50],['edit',20],['card 30x40',240],['card 30x40 ',0],['card 20x30',150],
+  ['soft copy Professional',100],['soft copy',70],['quick service',20],['pic 15x21 print with soft',75],['pic 15x21 print with soft ',75],['pic 13x18 print with soft',75],
+  ['special مرايا',350],['مج فنجال',280],['مج سحري',180],['مج الوان',250],['مج ابيض',150],['ساعه',450],
+  ['مرايا مدور',220],['مرايا قلب',220]
+];
+
+async function importStandardProducts(){
+  if(allBranches.length===0) return alert('أضف فرع واحد على الأقل الأول');
+  const branchId = document.getElementById('inv-branch').value || allBranches[0].id;
+  if(!confirm(`هيتم إضافة ${STANDARD_PRODUCTS.length} منتج للفرع "${branchName(branchId)}". متابعة؟`)) return;
+  const records = STANDARD_PRODUCTS.map(([name, price])=>({
+    id: uid(), name, code:'', price, branch_id: branchId, stock_qty:0, updated_at: now(), deleted:0
+  }));
+  await idbPutMany('products', records);
+  await refreshProducts();
+  alert('تم استيراد المنتجات بنجاح');
+  if(navigator.onLine) syncNow();
+}
+document.getElementById('import-products-btn').onclick = importStandardProducts;
+
+// بذر المنتجات القياسية تلقائياً مرة واحدة بس (أول تشغيل للنظام على الجهاز ده)
+// عشان المنتجات تفضل موجودة دايماً من غير ما حد يحتاج يدوس "استيراد" كل مرة.
+async function seedStandardProductsOnce(branchId){
+  const records = STANDARD_PRODUCTS.map(([name, price])=>({
+    id: uid(), name, code:'', price, branch_id: branchId, stock_qty:0, updated_at: now(), deleted:0
+  }));
+  await idbPutMany('products', records);
+}
+
+document.getElementById('add-product-btn').onclick = ()=>openProductModal();
+document.getElementById('pm-cancel').onclick = ()=>document.getElementById('product-modal').classList.remove('active');
+
+let editingProductId = null;
+function openProductModal(id){
+  editingProductId = id || null;
+  const p = id ? allProducts.find(x=>x.id===id) : null;
+  document.getElementById('product-modal-title').textContent = id ? 'تعديل منتج' : 'منتج جديد';
+  document.getElementById('pm-name').value = p?.name || '';
+  document.getElementById('pm-code').value = p?.code || '';
+  document.getElementById('pm-price').value = p?.price || '';
+  document.getElementById('pm-branch').value = p?.branch_id || '';
+  document.getElementById('pm-stock').value = p?.stock_qty ?? 0;
+  document.getElementById('product-modal').classList.add('active');
+}
+window.editProduct = (id)=>openProductModal(id);
+window.deleteProduct = async (id)=>{
+  if(currentUser.role!=='admin') return; // حماية إضافية، الزرار أصلاً مش ظاهر لغير المدير
+  const p = allProducts.find(x=>x.id===id);
+  p.deleted = 1; p.updated_at = now();
+  await idbPut('products', p);
+  await refreshProducts();
+};
+
+document.getElementById('pm-save').onclick = async ()=>{
+  const name = document.getElementById('pm-name').value.trim();
+  const price = parseFloat(document.getElementById('pm-price').value);
+  if(!name || isNaN(price)) return alert('اكتب اسم المنتج والسعر');
+  const record = {
+    id: editingProductId || uid(),
+    name,
+    code: document.getElementById('pm-code').value.trim(),
+    price,
+    branch_id: document.getElementById('pm-branch').value,
+    stock_qty: parseFloat(document.getElementById('pm-stock').value) || 0,
+    updated_at: now(),
+    deleted: 0
+  };
+  await idbPut('products', record);
+  document.getElementById('product-modal').classList.remove('active');
+  await refreshProducts();
+};
+
+// ============================================================
+// المصادقة (تسجيل الدخول) والصلاحيات
+// ============================================================
+let allUsers = [];
+
+async function ensureDefaultAdmin(){
+  const users = await idbAll('users');
+  const DEFAULT_USERNAME = 'Karim';
+  const DEFAULT_PASSWORD = '01551760011';
+  if(users.length===0){
+    const hash = await hashPassword(DEFAULT_PASSWORD);
+    await idbPut('users', {
+      id: uid(), name:'Karim', username: DEFAULT_USERNAME, password_hash:hash,
+      role:'admin', branch_id:'', updated_at: now(), deleted:0
+    });
+  } else if(users.length===1 && users[0].username==='admin'){
+    // ترقية من الحساب الافتراضي القديم (admin/admin123) للحساب الجديد
+    const hash = await hashPassword(DEFAULT_PASSWORD);
+    const u = users[0];
+    u.name = 'Karim'; u.username = DEFAULT_USERNAME; u.password_hash = hash; u.updated_at = now();
+    await idbPut('users', u);
+  }
+}
+
+// بيحاول يجيب توكن JWT من السيرفر لو الجهاز أونلاين، ويخزنه في localStorage
+// عشان يتبعت بعد كده مع كل مزامنة. لو مفيش نت أو السيرفر مش راضي، بنتجاهل
+// الخطأ بهدوء ونكمل تسجيل الدخول المحلي عادي (النظام أساساً أوفلاين-فيرست).
+async function tryFetchAuthToken(username, password){
+  if(!navigator.onLine) return;
+  try{
+    const res = await fetch(API_URL + '/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    if(!res.ok) return; // السيرفر رفض (يوزر مش موجود عنده لسه، أو باسورد مختلف) - مش مشكلة، هنعتمد على الدخول المحلي
+    const data = await res.json();
+    if(data.token) localStorage.setItem(AUTH_TOKEN_KEY, data.token);
+  }catch(err){
+    console.warn('تعذر جلب توكن المصادقة من السيرفر (هيشتغل النظام أوفلاين زي العادة):', err);
+  }
+}
+
+async function attemptLogin(){
+  try{
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    if(!username || !password){
+      document.getElementById('login-error').textContent = 'اكتب اسم الدخول وكلمة المرور';
+      document.getElementById('login-error').style.display = 'block';
+      return;
+    }
+    const hash = await hashPassword(password);
+    allUsers = await idbAll('users');
+    const user = allUsers.find(u=>u.username===username && u.password_hash===hash);
+    if(!user){
+      document.getElementById('login-error').textContent = 'بيانات الدخول غير صحيحة';
+      document.getElementById('login-error').style.display = 'block';
+      return;
+    }
+    document.getElementById('login-error').style.display = 'none';
+    currentUser = user;
+    localStorage.setItem('kp_current_user_id', user.id);
+    await tryFetchAuthToken(username, password); // بست-إفورت: ماينفعش يوقف الدخول لو فشل
+    document.getElementById('login-overlay').classList.add('hidden');
+    await afterLogin();
+  }catch(err){
+    console.error('Login error:', err);
+    const box = document.getElementById('startup-error');
+    box.textContent = 'حصل خطأ أثناء تسجيل الدخول: ' + err.message;
+    box.style.display = 'block';
+  }
+}
+document.getElementById('login-btn').onclick = attemptLogin;
+document.getElementById('login-password').addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
+
+function applyRolePermissions(){
+  document.getElementById('currentUserName').textContent = currentUser.name;
+  document.getElementById('currentUserRole').textContent = currentUser.role==='admin' ? 'مدير' : 'كاشير';
+  document.querySelectorAll('nav .admin-only').forEach(btn=>{
+    btn.style.display = currentUser.role==='admin' ? 'inline-block' : 'none';
+  });
+  if(currentUser.role!=='admin'){
+    // الكاشير يبدأ دايماً على شاشة الفاتورة الجديدة
+    document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+    document.querySelector('nav button[data-view="invoice-new"]').classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-invoice-new').classList.add('active');
+  }
+}
+
+async function afterLogin(){
+  applyRolePermissions();
+  await refreshAll();
+  await ensureShiftForCurrentUser();
+  setSyncStatus(navigator.onLine ? 'جاهز للمزامنة' : 'أوفلاين - العمل محلي', navigator.onLine?'online':'');
+  if(navigator.onLine) syncNow();
+}
+
+// ============================================================
+// الشفتات (فتح/إغلاق الشفت)
+// ============================================================
+async function ensureShiftForCurrentUser(){
+  const shifts = await idbAll('shifts');
+  currentShift = shifts.find(s=>s.user_id===currentUser.id && s.status==='open') || null;
+  if(!currentShift){
+    currentShift = {
+      id: uid(), branch_id: currentUser.branch_id || (allBranches[0]?.id||''),
+      user_id: currentUser.id, user_name: currentUser.name,
+      opened_at: now(), closed_at: null, status:'open', summary_json:null,
+      updated_at: now(), deleted:0
+    };
+    await idbPut('shifts', currentShift);
+    shifts.push(currentShift);
+  }
+  allShiftsCache = shifts;
+  renderShiftBar();
+  renderInvoicesTable();
+}
+
+function renderShiftBar(){
+  if(!currentShift) { document.getElementById('shiftStatus').textContent = 'لا يوجد شفت مفتوح'; return; }
+  document.getElementById('shiftStatus').textContent = 'شفت مفتوح من ' + new Date(currentShift.opened_at).toLocaleTimeString('ar-EG');
+}
+
+document.getElementById('closeShiftBtn').onclick = ()=>{
+  if(!currentShift) return;
+  document.getElementById('cs-actual-cash').value = '';
+  document.getElementById('cs-password').value = '';
+  document.getElementById('cs-error').style.display = 'none';
+  document.getElementById('close-shift-modal').classList.add('active');
+};
+document.getElementById('cs-cancel').onclick = ()=>document.getElementById('close-shift-modal').classList.remove('active');
+document.getElementById('cs-password').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('cs-confirm').click(); });
+
+document.getElementById('cs-confirm').onclick = async ()=>{
+  const actualCashInput = document.getElementById('cs-actual-cash').value;
+  const password = document.getElementById('cs-password').value;
+  if(actualCashInput===''){ alert('اكتب الكاش الموجود فعلياً في الدرج'); return; }
+  if(!password){ alert('لازم كلمة مرور الكاشير للتأكيد'); return; }
+
+  // بنتأكد من باسورد صاحب الشفت نفسه (الكاشير اللي فاتحه)، مش أي حد تاني
+  const shiftOwner = (await idbAll('users')).find(u=>u.id===currentShift.user_id);
+  const enteredHash = await hashPassword(password);
+  if(!shiftOwner || enteredHash !== shiftOwner.password_hash){
+    document.getElementById('cs-error').style.display = 'block';
+    return;
+  }
+  document.getElementById('cs-error').style.display = 'none';
+  document.getElementById('close-shift-modal').classList.remove('active');
+
+  await closeCurrentShift(parseFloat(actualCashInput) || 0);
+};
+
+async function closeCurrentShift(actualCash){
+  const fin = await computeShiftFinancials(currentShift.id);
+  const variance = centsToNumber(toCents(actualCash) - toCents(fin.netCash));
+
+  const summary = { ...fin, actualCash, variance, closedAt: now() };
+
+  currentShift.status = 'closed';
+  currentShift.closed_at = now();
+  currentShift.summary_json = JSON.stringify(summary);
+  currentShift.updated_at = now();
+  await idbPut('shifts', currentShift);
+
+  renderShiftSummary(summary);
+  currentShift = null;
+  if(navigator.onLine) syncNow();
+  // مفيش إعادة فتح شفت تلقائي هنا -- إغلاق الشفت بقى معناه تسجيل خروج الكاشير،
+  // ولو حد تاني هيشتغل بعده هيسجل دخوله هو ويتفتح له شفت جديد باسمه.
+}
+
+function renderShiftSummary(s){
+  const body = document.getElementById('shift-summary-body');
+  const varianceLabel = s.variance===0 ? 'مطابق' : (s.variance>0 ? 'زيادة' : 'عجز');
+  const varianceColor = s.variance===0 ? 'var(--green)' : 'var(--red)';
+  const oldInvLine = s.collectedOnOtherShiftsInvoices > 0
+    ? `<div class="summary-row" style="color:var(--muted); font-size:12px;"><span>منها تحصيل على فواتير من شفتات سابقة</span><span>${s.collectedOnOtherShiftsInvoices.toFixed(2)} ج.م</span></div>`
+    : '';
+  body.innerHTML = `
+    <div class="summary-row"><span>عدد الفواتير</span><span>${s.invoicesCount}</span></div>
+    <div class="summary-row"><span>إجمالي المبيعات (فواتير الشفت ده)</span><span>${s.totalSales.toFixed(2)} ج.م</span></div>
+    ${s.totalVat>0 ? `<div class="summary-row" style="color:var(--muted); font-size:12px;"><span>منها ضريبة القيمة المضافة</span><span>${s.totalVat.toFixed(2)} ج.م</span></div>` : ''}
+    <div class="summary-row"><span>إجمالي التحصيل الفعلي في الشفت ده</span><span>${s.totalPaid.toFixed(2)} ج.م</span></div>
+    ${oldInvLine}
+    <div class="summary-row"><span>كاش</span><span>${(s.byMethod.cash||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>فيزا</span><span>${(s.byMethod.visa||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>انستا باي</span><span>${(s.byMethod['insta pay']||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>محفظة</span><span>${(s.byMethod.wallet||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>إجمالي المصروفات</span><span>-${s.totalExpenses.toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>إجمالي السلف</span><span>-${s.totalAdvances.toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>صافي الكاش المتوقع بالدرج</span><span>${s.netCash.toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>الكاش الفعلي اللي اتكتب</span><span>${(s.actualCash??0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row total"><span style="color:${varianceColor};">الفرق (${varianceLabel})</span><span style="color:${varianceColor};">${Math.abs(s.variance).toFixed(2)} ج.م</span></div>
+  `;
+  document.getElementById('shift-summary-modal').classList.add('active');
+}
+document.getElementById('ssm-close').onclick = ()=>{
+  document.getElementById('shift-summary-modal').classList.remove('active');
+  // إغلاق الشفت = تسجيل خروج الكاشير من الجهاز ده
+  localStorage.removeItem('kp_current_user_id');
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  location.reload();
+};
+document.getElementById('ssm-print').onclick = ()=>window.print();
+
+// ============================================================
+// المصروفات
+// ============================================================
+async function refreshExpenses(){
+  const expenses = (await idbAll('expenses')).sort((a,b)=>b.created_at-a.created_at);
+  document.getElementById('expenses-empty').style.display = expenses.length? 'none':'block';
+  document.getElementById('expenses-body').innerHTML = expenses.map(e=>{
+    // زرار الحذف للمدير بس (نفس منطق السلف بالظبط)، عشان الكاشير مايقدرش يمسح
+    // مصروف حصل فعلاً ويخبي أثره من حساب صافي كاش الشفت وقت المراجعة.
+    const deleteBtn = currentUser.role==='admin'
+      ? `<button class="btn small danger" onclick="deleteExpense('${e.id}')">حذف</button>`
+      : '';
+    return `
+    <tr>
+      <td>${e.description}</td><td>${e.category||'-'}</td><td>${e.amount.toFixed(2)} ج.م</td>
+      <td>${branchName(e.branch_id)}</td><td>${e.created_by||'-'}</td>
+      <td>${new Date(e.created_at).toLocaleString('ar-EG')}</td>
+      <td>${deleteBtn}</td>
+    </tr>`;
+  }).join('');
+}
+window.deleteExpense = async (id)=>{
+  if(currentUser.role!=='admin') return; // حماية إضافية، الزرار أصلاً مش ظاهر لغير المدير
+  const e = (await idbAll('expenses')).find(x=>x.id===id);
+  e.deleted = 1; e.updated_at = now();
+  await idbPut('expenses', e);
+  await refreshExpenses();
+  if(navigator.onLine) syncNow();
+};
+document.getElementById('add-expense-btn').onclick = ()=>{
+  document.getElementById('em-description').value='';
+  document.getElementById('em-amount').value='';
+  document.getElementById('expense-modal').classList.add('active');
+};
+document.getElementById('em-cancel').onclick = ()=>document.getElementById('expense-modal').classList.remove('active');
+document.getElementById('em-save').onclick = async ()=>{
+  const description = document.getElementById('em-description').value.trim();
+  const amount = parseFloat(document.getElementById('em-amount').value);
+  if(!description || isNaN(amount) || amount<=0) return alert('اكتب الوصف ومبلغ أكبر من صفر');
+  await idbPut('expenses', {
+    id: uid(), branch_id: currentShift?.branch_id || allBranches[0]?.id || '',
+    shift_id: currentShift?.id || null, description,
+    amount, category: document.getElementById('em-category').value,
+    created_by: currentUser.name, created_at: now(), updated_at: now(), deleted:0
+  });
+  document.getElementById('expense-modal').classList.remove('active');
+  await refreshExpenses();
+  if(navigator.onLine) syncNow();
+};
+
+// ============================================================
+// السلف
+// ============================================================
+async function refreshAdvances(){
+  const advances = (await idbAll('advances')).sort((a,b)=>b.created_at-a.created_at);
+  document.getElementById('advances-empty').style.display = advances.length? 'none':'block';
+  document.getElementById('advances-body').innerHTML = advances.map(a=>{
+    // زرار الحذف للمدير بس، عشان الكاشير مايقدرش يمسح سلفة اتاخدت بالفعل ويخبي أثرها
+    // من حساب المصروفات/صافي كاش الشفت. لأي صلاحية زيادة عن كده لازم تتضاف من حساب المدير.
+    const deleteBtn = currentUser.role==='admin'
+      ? `<button class="btn small danger" onclick="deleteAdvance('${a.id}')">حذف</button>`
+      : '';
+    const statusBadge = a.settled
+      ? `<span class="badge synced">خُصمت من الراتب</span>`
+      : `<span class="badge pending">لسه مستحقة</span>`;
+    return `
+    <tr>
+      <td>${a.employee_name}</td><td>${a.amount.toFixed(2)} ج.م</td><td>${a.note||'-'}</td>
+      <td>${branchName(a.branch_id)}</td><td>${a.created_by||'-'}</td>
+      <td>${new Date(a.created_at).toLocaleString('ar-EG')}</td>
+      <td>${statusBadge}</td>
+      <td>${deleteBtn}</td>
+    </tr>`;
+  }).join('');
+}
+window.deleteAdvance = async (id)=>{
+  if(currentUser.role!=='admin') return; // حماية إضافية، الزرار أصلاً مش ظاهر لغير المدير
+  const a = (await idbAll('advances')).find(x=>x.id===id);
+  a.deleted = 1; a.updated_at = now();
+  await idbPut('advances', a);
+  await refreshAdvances();
+  if(navigator.onLine) syncNow();
+};
+document.getElementById('add-advance-btn').onclick = async ()=>{
+  const users = await idbAll('users');
+  document.getElementById('am-employee-select').innerHTML = users.map(u=>`<option value="${u.id}">${u.name}</option>`).join('') || '<option value="">لا يوجد موظفين</option>';
+  document.getElementById('am-amount').value='';
+  document.getElementById('am-note').value='';
+  document.getElementById('am-employee-password').value='';
+  document.getElementById('am-error').style.display='none';
+  document.getElementById('advance-modal').classList.add('active');
+};
+document.getElementById('am-cancel').onclick = ()=>document.getElementById('advance-modal').classList.remove('active');
+document.getElementById('am-save').onclick = async ()=>{
+  const userId = document.getElementById('am-employee-select').value;
+  const amount = parseFloat(document.getElementById('am-amount').value);
+  const enteredPassword = document.getElementById('am-employee-password').value;
+  if(!userId) return alert('اختار الموظف المستلف');
+  if(isNaN(amount) || amount<=0) return alert('اكتب مبلغ صحيح');
+  if(!enteredPassword) return alert('لازم كلمة مرور الموظف للتأكيد');
+
+  const users = await idbAll('users');
+  const employee = users.find(u=>u.id===userId);
+  const enteredHash = await hashPassword(enteredPassword);
+  if(!employee || enteredHash !== employee.password_hash){
+    document.getElementById('am-error').style.display = 'block';
+    return;
+  }
+  document.getElementById('am-error').style.display = 'none';
+
+  await idbPut('advances', {
+    id: uid(), branch_id: currentShift?.branch_id || allBranches[0]?.id || '',
+    shift_id: currentShift?.id || null, employee_id: employee.id, employee_name: employee.name, amount,
+    note: document.getElementById('am-note').value.trim(),
+    created_by: currentUser.name, created_at: now(), updated_at: now(),
+    settled: 0, settled_at: null, deleted:0
+  });
+  document.getElementById('advance-modal').classList.remove('active');
+  await refreshAdvances();
+  if(navigator.onLine) syncNow();
+};
+
+// ============================================================
+// الموظفين (مستخدمين + صلاحيات) - للمدير فقط
+// ============================================================
+async function refreshUsers(){
+  allUsers = await idbAll('users');
+  document.getElementById('users-body').innerHTML = allUsers.map(u=>`
+    <tr>
+      <td>${u.name}</td><td>${u.username}</td>
+      <td>${u.role==='admin'?'مدير':'كاشير'}</td><td>${branchName(u.branch_id)}</td>
+      <td>
+        <button class="btn small secondary" onclick="editUser('${u.id}')">تعديل</button>
+        ${u.id!==currentUser.id ? `<button class="btn small danger" onclick="deleteUser('${u.id}')">حذف</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+let editingUserId = null;
+document.getElementById('add-user-btn').onclick = ()=>openUserModal();
+function openUserModal(id){
+  editingUserId = id || null;
+  const u = id ? allUsers.find(x=>x.id===id) : null;
+  document.getElementById('user-modal-title').textContent = id ? 'تعديل موظف' : 'موظف جديد';
+  document.getElementById('um-name').value = u?.name || '';
+  document.getElementById('um-username').value = u?.username || '';
+  document.getElementById('um-password').value = '';
+  document.getElementById('um-role').value = u?.role || 'cashier';
+  document.getElementById('um-branch').value = u?.branch_id || '';
+  document.getElementById('um-salary').value = u?.monthly_salary ?? '';
+  document.getElementById('user-modal').classList.add('active');
+}
+window.editUser = (id)=>openUserModal(id);
+window.deleteUser = async (id)=>{
+  if(currentUser.role!=='admin') return; // حماية إضافية، الزرار أصلاً مش ظاهر لغير المدير
+  if(id===currentUser.id) return; // حماية إضافية: ميقدرش يمسح حسابه هو نفسه (الزرار أصلاً مخفي في الواجهة)
+  const u = allUsers.find(x=>x.id===id);
+  u.deleted = 1; u.updated_at = now();
+  await idbPut('users', u);
+  await refreshUsers();
+};
+document.getElementById('um-cancel').onclick = ()=>document.getElementById('user-modal').classList.remove('active');
+document.getElementById('um-save').onclick = async ()=>{
+  const name = document.getElementById('um-name').value.trim();
+  const username = document.getElementById('um-username').value.trim();
+  const newPass = document.getElementById('um-password').value;
+  if(!name || !username) return alert('اكتب الاسم واسم الدخول');
+  if(!editingUserId && !newPass) return alert('لازم كلمة مرور للموظف الجديد');
+
+  // اسم الدخول لازم يكون فريد لكل شخص
+  const dup = allUsers.find(u=>u.username===username && u.id!==editingUserId);
+  if(dup) return alert('اسم الدخول ده مستخدم بالفعل، اختار اسم مختلف لكل موظف');
+
+  const existing = editingUserId ? allUsers.find(x=>x.id===editingUserId) : null;
+  const record = {
+    id: editingUserId || uid(), name, username,
+    password_hash: newPass ? await hashPassword(newPass) : existing.password_hash,
+    role: document.getElementById('um-role').value,
+    branch_id: document.getElementById('um-branch').value,
+    monthly_salary: parseFloat(document.getElementById('um-salary').value) || 0,
+    updated_at: now(), deleted:0
+  };
+  await idbPut('users', record);
+  document.getElementById('user-modal').classList.remove('active');
+  await refreshUsers();
+  if(navigator.onLine) syncNow();
+};
+
+// ============================================================
+// الرواتب والسلف (للمدير فقط)
+// ============================================================
+async function refreshSalaries(){
+  const users = await idbAll('users');
+  const advances = await idbAll('advances');
+  document.getElementById('salaries-body').innerHTML = users.map(u=>{
+    // بنطابق بالـ employee_id لو موجود (الطريقة الجديدة الأدق)، وكمان بالاسم
+    // كـ fallback للسلف القديمة اللي اتسجلت قبل إضافة employee_id.
+    const mine = advances.filter(a=>!a.settled && (a.employee_id===u.id || (!a.employee_id && a.employee_name===u.name)));
+    const outstanding = safeSumFinancials(mine, a=>a.amount);
+    const salary = u.monthly_salary || 0;
+    const net = centsToNumber(toCents(salary) - toCents(outstanding));
+    const action = mine.length
+      ? `<button class="btn small" onclick="settleEmployeeAdvances('${u.id}')">تسوية وصرف الراتب</button>`
+      : `<span style="color:var(--muted); font-size:13px;">لا توجد سلف مستحقة</span>`;
+    return `
+    <tr>
+      <td>${u.name}</td>
+      <td>${salary.toFixed(2)} ج.م</td>
+      <td>${outstanding.toFixed(2)} ج.م</td>
+      <td style="font-weight:700;">${net.toFixed(2)} ج.م</td>
+      <td>${action}</td>
+    </tr>`;
+  }).join('');
+}
+window.settleEmployeeAdvances = async (userId)=>{
+  const users = await idbAll('users');
+  const u = users.find(x=>x.id===userId);
+  if(!u) return;
+  const advances = await idbAll('advances');
+  const mine = advances.filter(a=>!a.settled && (a.employee_id===userId || (!a.employee_id && a.employee_name===u.name)));
+  if(mine.length===0) return;
+  const outstanding = safeSumFinancials(mine, a=>a.amount);
+  const salary = u.monthly_salary || 0;
+  const net = centsToNumber(toCents(salary) - toCents(outstanding));
+  if(!confirm(`هيتم اعتبار سلف بقيمة ${outstanding.toFixed(2)} ج.م مخصومة من راتب "${u.name}" (صافي المستحق ${net.toFixed(2)} ج.م). السلف دي مش هتظهر تاني كمستحقة. متأكد؟`)) return;
+  for(const a of mine){
+    a.settled = 1;
+    a.settled_at = now();
+    a.updated_at = now();
+    await idbPut('advances', a);
+  }
+  await refreshAdvances();
+  await refreshSalaries();
+  if(navigator.onLine) syncNow();
+};
+
+// ============================================================
+// تقفيل الشفتات والتقارير (للمدير فقط)
+// ============================================================
+function refreshReportBranchSelect(){
+  const sel = document.getElementById('rep-branch');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">كل الفروع</option>' + allBranches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  sel.value = current || '';
+}
+
+function dateStr(d){ return d.toISOString().slice(0,10); }
+function reportQuickRange(type){
+  const today = new Date();
+  if(type==='today'){
+    document.getElementById('rep-start').value = dateStr(today);
+    document.getElementById('rep-end').value = dateStr(today);
+  } else if(type==='yesterday'){
+    const y = new Date(today); y.setDate(y.getDate()-1);
+    document.getElementById('rep-start').value = dateStr(y);
+    document.getElementById('rep-end').value = dateStr(y);
+  } else if(type==='month'){
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    document.getElementById('rep-start').value = dateStr(first);
+    document.getElementById('rep-end').value = dateStr(today);
+  }
+  runReport();
+}
+document.getElementById('rep-today-btn').onclick = ()=>reportQuickRange('today');
+document.getElementById('rep-yesterday-btn').onclick = ()=>reportQuickRange('yesterday');
+document.getElementById('rep-month-btn').onclick = ()=>reportQuickRange('month');
+document.getElementById('rep-run-btn').onclick = runReport;
+
+const REPORT_METHODS = ['cash','visa','insta pay','wallet'];
+
+async function runReport(){
+  const branchFilter = document.getElementById('rep-branch').value;
+  const startStr = document.getElementById('rep-start').value;
+  const endStr = document.getElementById('rep-end').value;
+  if(!startStr || !endStr) return alert('اختار الفترة (من تاريخ - إلى تاريخ) الأول');
+  const startTs = new Date(startStr + 'T00:00:00').getTime();
+  const endTs = new Date(endStr + 'T23:59:59').getTime();
+
+  let shifts = (await idbAll('shifts')).filter(s=>s.opened_at>=startTs && s.opened_at<=endTs);
+  if(branchFilter) shifts = shifts.filter(s=>s.branch_id===branchFilter);
+
+  // لكل شفت: لو مقفول بنستخدم الملخص المحفوظ وقت القفل (فيه الكاش الفعلي والفرق الحقيقي)،
+  // ولو لسه مفتوح بنحسب أرقامه لحظياً (من غير كاش فعلي/فرق لإنه لسه ما اتقفلش).
+  const rows = [];
+  for(const s of shifts){
+    let fin;
+    if(s.status==='closed' && s.summary_json){
+      fin = JSON.parse(s.summary_json);
+    } else {
+      fin = await computeShiftFinancials(s.id);
+      fin.actualCash = null; fin.variance = null;
+    }
+    rows.push({shift: s, fin});
+  }
+
+  // تجميع حسب الفرع
+  const byBranch = {};
+  for(const {shift, fin} of rows){
+    const key = shift.branch_id || 'unknown';
+    if(!byBranch[key]){
+      byBranch[key] = {branch_id: key, shiftsCount:0, totalSales:0, totalVat:0, totalExpenses:0, totalAdvances:0, netCash:0, cash:0, visa:0, wallet:0, 'insta pay':0};
+    }
+    const b = byBranch[key];
+    b.shiftsCount++;
+    b.totalSales = centsToNumber(toCents(b.totalSales) + toCents(fin.totalSales||0));
+    b.totalVat = centsToNumber(toCents(b.totalVat) + toCents(fin.totalVat||0));
+    b.totalExpenses = centsToNumber(toCents(b.totalExpenses) + toCents(fin.totalExpenses||0));
+    b.totalAdvances = centsToNumber(toCents(b.totalAdvances) + toCents(fin.totalAdvances||0));
+    // صافي الكاش المتوقع بالدرج = كاش الفترة - المصروفات - السلف (نفس حساب قفل الشفت بالظبط)
+    b.netCash = centsToNumber(toCents(b.netCash) + toCents(fin.netCash||0));
+    for(const m of REPORT_METHODS){
+      b[m] = centsToNumber(toCents(b[m]) + toCents((fin.byMethod && fin.byMethod[m]) || 0));
+    }
+  }
+
+  const branchRows = Object.values(byBranch).map(b=>`
+    <tr>
+      <td>${branchName(b.branch_id)}</td>
+      <td>${b.shiftsCount}</td>
+      <td>${b.totalSales.toFixed(2)} ج.م</td>
+      <td>${b.totalExpenses.toFixed(2)} ج.م</td>
+      <td>${b.totalAdvances.toFixed(2)} ج.م</td>
+      <td>${b.cash.toFixed(2)} ج.م</td>
+      <td>${b.visa.toFixed(2)} ج.م</td>
+      <td>${b['insta pay'].toFixed(2)} ج.م</td>
+      <td>${b.wallet.toFixed(2)} ج.م</td>
+      <td style="font-weight:700;">${b.netCash.toFixed(2)} ج.م</td>
+    </tr>`).join('') || `<tr><td colspan="10" style="text-align:center; color:var(--muted);">لا توجد بيانات في الفترة المختارة</td></tr>`;
+  document.getElementById('rep-branch-body').innerHTML = branchRows;
+
+  const shiftRows = rows.sort((a,b)=>b.shift.opened_at-a.shift.opened_at).map(({shift, fin})=>{
+    const statusLabel = shift.status==='closed' ? 'مقفول' : 'مفتوح دلوقتي';
+    const closedLabel = shift.closed_at ? new Date(shift.closed_at).toLocaleString('ar-EG') : '-';
+    const varianceCell = (fin.variance===null || fin.variance===undefined) ? '-' :
+      `${fin.variance>=0?'+':''}${fin.variance.toFixed(2)} ج.م`;
+    return `
+    <tr>
+      <td>${new Date(shift.opened_at).toLocaleString('ar-EG')}</td>
+      <td>${closedLabel}</td>
+      <td>${branchName(shift.branch_id)}</td>
+      <td>${shift.user_name||'-'}</td>
+      <td>${statusLabel}</td>
+      <td>${(fin.totalSales||0).toFixed(2)} ج.م</td>
+      <td>${(fin.totalExpenses||0).toFixed(2)} ج.م</td>
+      <td>${(fin.totalAdvances||0).toFixed(2)} ج.م</td>
+      <td style="font-weight:700;">${(fin.netCash||0).toFixed(2)} ج.م</td>
+      <td>${varianceCell}</td>
+      <td><button class="btn small secondary" onclick="openShiftDetails('${shift.id}')">تفاصيل الشفت</button></td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="11" style="text-align:center; color:var(--muted);">لا توجد شفتات في الفترة المختارة</td></tr>`;
+  document.getElementById('rep-shifts-body').innerHTML = shiftRows;
+
+  const grand = Object.values(byBranch).reduce((acc,b)=>{
+    acc.totalSales = centsToNumber(toCents(acc.totalSales) + toCents(b.totalSales));
+    acc.totalVat = centsToNumber(toCents(acc.totalVat) + toCents(b.totalVat));
+    acc.totalExpenses = centsToNumber(toCents(acc.totalExpenses) + toCents(b.totalExpenses));
+    acc.totalAdvances = centsToNumber(toCents(acc.totalAdvances) + toCents(b.totalAdvances));
+    acc.netCash = centsToNumber(toCents(acc.netCash) + toCents(b.netCash));
+    return acc;
+  }, {totalSales:0, totalVat:0, totalExpenses:0, totalAdvances:0, netCash:0});
+  document.getElementById('rep-grand-total').textContent =
+    `الإجمالي العام في الفترة المختارة: إجمالي المبيعات ${grand.totalSales.toFixed(2)} ج.م — منها ضريبة القيمة المضافة ${grand.totalVat.toFixed(2)} ج.م — إجمالي المصروفات ${grand.totalExpenses.toFixed(2)} ج.م — إجمالي السلف ${grand.totalAdvances.toFixed(2)} ج.م — صافي الكاش المتوقع بالدرج ${grand.netCash.toFixed(2)} ج.م`;
+}
+
+// ============================================================
+// تفاصيل الشفت الكاملة (من صفحة التقفيل والتقارير) + قفل شفتات
+// الموظفين كمدير. متاح للمدير بس (الزرار نفسه أصلاً في صفحة admin-only).
+// ============================================================
+let sdmCurrentShiftId = null;
+
+window.openShiftDetails = async (shiftId)=>{
+  const shift = (await idbAll('shifts')).find(s=>s.id===shiftId);
+  if(!shift) return;
+  sdmCurrentShiftId = shiftId;
+
+  document.getElementById('sdm-title').textContent = 'تفاصيل شفت: ' + (shift.user_name || '-');
+  const statusLabel = shift.status==='closed' ? 'مقفول' : 'مفتوح دلوقتي';
+  document.getElementById('sdm-info').innerHTML = `
+    الفرع: ${branchName(shift.branch_id)} — الحالة: ${statusLabel}<br>
+    فُتح: ${new Date(shift.opened_at).toLocaleString('ar-EG')}
+    ${shift.closed_at ? ' — اتقفل: ' + new Date(shift.closed_at).toLocaleString('ar-EG') : ''}
+  `;
+
+  // زرار قفل الشفت كمدير بيظهر بس لو المستخدم مدير والشفت لسه مفتوح.
+  const closeBox = document.getElementById('sdm-close-shift-box');
+  if(currentUser.role==='admin' && shift.status==='open'){
+    closeBox.style.display = 'block';
+    document.getElementById('sdm-actual-cash').value = '';
+  } else {
+    closeBox.style.display = 'none';
+  }
+
+  let fin;
+  if(shift.status==='closed' && shift.summary_json){
+    fin = JSON.parse(shift.summary_json);
+  } else {
+    fin = await computeShiftFinancials(shiftId);
+  }
+  renderShiftDetailsSummary(fin);
+
+  const invoices = (await idbAll('invoices')).filter(i=>i.shift_id===shiftId && !i.deleted).sort((a,b)=>b.created_at-a.created_at);
+  document.getElementById('sdm-invoices-body').innerHTML = invoices.map(inv=>{
+    const adminBtns = currentUser.role==='admin'
+      ? `<button class="btn small secondary" onclick="openEditInvoice('${inv.id}')">تعديل</button>
+         <button class="btn small danger" onclick="deleteInvoiceFromShiftDetails('${inv.id}')">حذف</button>`
+      : '';
+    return `<tr>
+      <td>${inv.invoice_number ?? '-'}</td>
+      <td>${inv.customer_name}</td>
+      <td>${inv.total_cost.toFixed(2)}</td>
+      <td>${inv.paid.toFixed(2)}</td>
+      <td>${inv.remaining.toFixed(2)}</td>
+      <td>${inv.pay_method||'-'}</td>
+      <td>${inv.status==='delivered'?'تم التسليم':'لم يتم التسليم'}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn small secondary" onclick="viewInvoiceDetails('${inv.id}')">عرض التفاصيل</button>
+        ${adminBtns}
+      </td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="8" style="text-align:center; color:var(--muted);">لا توجد فواتير في الشفت ده</td></tr>`;
+
+  const expenses = (await idbAll('expenses')).filter(e=>e.shift_id===shiftId && !e.deleted);
+  document.getElementById('sdm-expenses-body').innerHTML = expenses.map(e=>`
+    <tr>
+      <td>${e.description}</td><td>${e.category||'-'}</td><td>${e.amount.toFixed(2)} ج.م</td>
+      <td>${currentUser.role==='admin' ? `<button class="btn small danger" onclick="deleteExpenseFromShiftDetails('${e.id}')">حذف</button>` : ''}</td>
+    </tr>`).join('') || `<tr><td colspan="4" style="text-align:center; color:var(--muted);">لا توجد مصروفات في الشفت ده</td></tr>`;
+
+  const advances = (await idbAll('advances')).filter(a=>a.shift_id===shiftId && !a.deleted);
+  document.getElementById('sdm-advances-body').innerHTML = advances.map(a=>`
+    <tr>
+      <td>${a.employee_name}</td><td>${a.amount.toFixed(2)} ج.م</td><td>${a.note||'-'}</td>
+      <td>${currentUser.role==='admin' ? `<button class="btn small danger" onclick="deleteAdvanceFromShiftDetails('${a.id}')">حذف</button>` : ''}</td>
+    </tr>`).join('') || `<tr><td colspan="4" style="text-align:center; color:var(--muted);">لا توجد سلف في الشفت ده</td></tr>`;
+
+  document.getElementById('shift-details-modal').classList.add('active');
+};
+
+function renderShiftDetailsSummary(fin){
+  const hasActual = fin.actualCash !== undefined && fin.actualCash !== null;
+  const varianceLine = hasActual ? `
+    <div class="summary-row"><span>الكاش الفعلي وقت القفل</span><span>${(fin.actualCash||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row total"><span>الفرق (عجز/زيادة)</span><span>${(fin.variance>=0?'+':'')}${(fin.variance||0).toFixed(2)} ج.م</span></div>
+  ` : '';
+  document.getElementById('sdm-summary').innerHTML = `
+    <div class="summary-row"><span>عدد الفواتير</span><span>${fin.invoicesCount||0}</span></div>
+    <div class="summary-row"><span>إجمالي المبيعات</span><span>${(fin.totalSales||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>كاش</span><span>${((fin.byMethod&&fin.byMethod.cash)||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>فيزا</span><span>${((fin.byMethod&&fin.byMethod.visa)||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>انستا باي</span><span>${((fin.byMethod&&fin.byMethod['insta pay'])||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>محفظة</span><span>${((fin.byMethod&&fin.byMethod.wallet)||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>إجمالي المصروفات</span><span>-${(fin.totalExpenses||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>إجمالي السلف</span><span>-${(fin.totalAdvances||0).toFixed(2)} ج.م</span></div>
+    <div class="summary-row total"><span>صافي الكاش المتوقع بالدرج</span><span>${(fin.netCash||0).toFixed(2)} ج.م</span></div>
+    ${varianceLine}
+  `;
+}
+
+document.getElementById('sdm-close').onclick = ()=> document.getElementById('shift-details-modal').classList.remove('active');
+
+// قفل شفت موظف تاني كمدير: مفيش داعي لباسورد الكاشير هنا لإن المدير أصلاً
+// معرّف نفسه ودخل بصلاحية admin، بعكس زرار "إغلاق الشفت" العادي اللي بيتأكد
+// من باسورد صاحب الشفت لإنه بيتقفل من نفس جهاز الكاشير.
+document.getElementById('sdm-close-shift-btn').onclick = async ()=>{
+  if(!sdmCurrentShiftId || currentUser.role!=='admin') return;
+  const actualCashInput = document.getElementById('sdm-actual-cash').value;
+  if(actualCashInput===''){ alert('اكتب الكاش الموجود فعلياً في الدرج'); return; }
+  if(!confirm('متأكد إنك عايز تقفل الشفت ده كمدير؟ الإجراء ده مش هينفع يتراجع فيه.')) return;
+  await closeShiftByAdmin(sdmCurrentShiftId, parseFloat(actualCashInput) || 0);
+  await openShiftDetails(sdmCurrentShiftId); // نحدّث نفس الشاشة تعرض إنه بقى مقفول
+  await runReport();
+};
+
+async function closeShiftByAdmin(shiftId, actualCash){
+  const shift = (await idbAll('shifts')).find(s=>s.id===shiftId);
+  if(!shift) return;
+  const fin = await computeShiftFinancials(shiftId);
+  const variance = centsToNumber(toCents(actualCash) - toCents(fin.netCash));
+  const summary = { ...fin, actualCash, variance, closedAt: now() };
+
+  shift.status = 'closed';
+  shift.closed_at = now();
+  shift.summary_json = JSON.stringify(summary);
+  shift.updated_at = now();
+  await idbPut('shifts', shift);
+  await refreshShiftsCache();
+
+  // لو المدير قفل شفته هو نفسه من الشاشة دي، بنحدّث شريط الشفت العلوي كمان
+  if(currentShift && currentShift.id===shiftId){
+    currentShift = null;
+    renderShiftBar();
+  }
+  if(navigator.onLine) syncNow();
+}
+
+// Wrappers بتحذف ثم تعيد رسم شاشة تفاصيل الشفت المفتوحة عشان القائمة تتحدث فوراً
+window.deleteInvoiceFromShiftDetails = async (id)=>{
+  await deleteInvoice(id);
+  if(sdmCurrentShiftId) await openShiftDetails(sdmCurrentShiftId);
+};
+window.deleteExpenseFromShiftDetails = async (id)=>{
+  await deleteExpense(id);
+  if(sdmCurrentShiftId) await openShiftDetails(sdmCurrentShiftId);
+};
+window.deleteAdvanceFromShiftDetails = async (id)=>{
+  await deleteAdvance(id);
+  if(sdmCurrentShiftId) await openShiftDetails(sdmCurrentShiftId);
+};
+
+// فاتورة جديدة (الكاشير)
+// ============================================================
+window.addToCart = (productId)=>{
+  const p = allProducts.find(x=>x.id===productId);
+  const existing = cart.find(c=>c.product_id===productId);
+  if(existing){ existing.qty += 1; }
+  else{ cart.push({product_id:p.id, name:p.name, price:p.price, qty:1}); }
+  renderCart();
+};
+window.removeFromCart = (productId)=>{
+  cart = cart.filter(c=>c.product_id!==productId);
+  renderCart();
+};
+window.changeQty = (productId, delta)=>{
+  const item = cart.find(c=>c.product_id===productId);
+  item.qty = Math.max(1, item.qty+delta);
+  renderCart();
+};
+
+function renderCart(){
+  const body = document.getElementById('cart-body');
+  body.innerHTML = cart.map(c=>`
+    <tr>
+      <td>${c.name}</td>
+      <td>${c.price}</td>
+      <td>
+        <button class="btn small secondary" onclick="changeQty('${c.product_id}',-1)">-</button>
+        ${c.qty}
+        <button class="btn small secondary" onclick="changeQty('${c.product_id}',1)">+</button>
+      </td>
+      <td>${(c.price*c.qty).toFixed(2)}</td>
+      <td><button class="btn small danger" onclick="removeFromCart('${c.product_id}')">حذف</button></td>
+    </tr>`).join('');
+  updateTotals();
+}
+
+const VAT_PERCENT = 14;
+
+function updateTotals(){
+  const subtotal = safeSumFinancials(cart, c=>c.price*c.qty);
+  // clamp بين 0 و100 دايماً، حتى لو اتكتبت قيمة برة النطاق ده (يدوي أو عن طريق لصق)
+  const discount = Math.min(100, Math.max(0, parseFloat(document.getElementById('inv-discount').value)||0));
+  const afterDiscount = centsToNumber(Math.round(toCents(subtotal) * (1 - discount/100)));
+  const vatApplied = document.getElementById('inv-vat').checked;
+  const vatAmount = vatApplied ? centsToNumber(Math.round(toCents(afterDiscount) * (VAT_PERCENT/100))) : 0;
+  const total = centsToNumber(toCents(afterDiscount) + toCents(vatAmount));
+  const paid = centsToNumber(toCents(document.getElementById('inv-paid').value));
+  const vatLine = document.getElementById('inv-vat-line');
+  if(vatApplied){
+    vatLine.style.display = 'block';
+    vatLine.textContent = `الإجمالي قبل الضريبة: ${afterDiscount.toFixed(2)} ج.م — ضريبة القيمة المضافة (${VAT_PERCENT}%): ${vatAmount.toFixed(2)} ج.م`;
+  } else {
+    vatLine.style.display = 'none';
+  }
+  document.getElementById('inv-total').textContent = total.toFixed(2);
+  document.getElementById('inv-remaining').textContent = 'المتبقي: ' + centsToNumber(toCents(total)-toCents(paid)).toFixed(2) + ' ج.م';
+  return {subtotal, afterDiscount, vatApplied, vatAmount, total, paid};
+}
+document.getElementById('inv-discount').addEventListener('input', updateTotals);
+document.getElementById('inv-vat').addEventListener('change', updateTotals);
+document.getElementById('inv-paid').addEventListener('input', updateTotals);
+
+document.getElementById('inv-save').onclick = async ()=>{
+  if(cart.length===0) return alert('أضف منتج واحد على الأقل للفاتورة');
+  // منع الضغط المزدوج (دبل كليك) من إنشاء فاتورتين بنفس الرقم أو بنفس المحتوى
+  const saveBtn = document.getElementById('inv-save');
+  if(saveBtn.disabled) return;
+  saveBtn.disabled = true;
+  try{
+  const {total, paid, vatApplied, vatAmount} = updateTotals();
+  const remaining = centsToNumber(toCents(total) - toCents(paid));
+
+  // كود الفاتورة: تسلسلي من 1 لآخر رقم، مبني على أعلى رقم موجود محلياً حالياً
+  // (ملحوظة: لو فرعين عملوا فاتورة في نفس اللحظة بالظبط وهما أوفلاين، ممكن نادراً
+  // يتكرر الرقم لحد ما يحصل sync؛ الأرقام مش هتتصادم غالباً في الاستخدام العادي).
+  const existingInvoices = await idbAll('invoices');
+  const nextNumber = existingInvoices.reduce((max,i)=>Math.max(max, i.invoice_number||0), 0) + 1;
+
+  const record = {
+    id: uid(),
+    invoice_number: nextNumber,
+    branch_id: document.getElementById('inv-branch').value,
+    customer_name: document.getElementById('inv-customer-name').value.trim() || 'عميل',
+    customer_phone: document.getElementById('inv-customer-phone').value.trim(),
+    items_json: JSON.stringify(cart),
+    discount_percent: Math.min(100, Math.max(0, parseFloat(document.getElementById('inv-discount').value)||0)),
+    vat_percent: vatApplied ? VAT_PERCENT : 0,
+    vat_amount: vatAmount,
+    total_cost: total,
+    paid,
+    remaining,
+    pay_method: document.getElementById('inv-pay-method').value,
+    status: (remaining<=0) ? 'delivered' : 'not Delivered',
+    created_by: currentUser.name,
+    shift_id: currentShift?.id || null,
+    created_at: now(),
+    updated_at: now(),
+    deleted: 0,
+    synced: 0
+  };
+  await idbPut('invoices', record);
+
+  // بنسجل التحصيل الأولي (المدفوع وقت إنشاء الفاتورة) في سجل "التحصيلات" برضه،
+  // مربوط بنفس الشفت المفتوح دلوقتي، عشان يتحسب صح وقت قفل الشفت والتقارير.
+  if(toCents(paid) > 0){
+    await idbPut('payments', {
+      id: uid(), invoice_id: record.id, branch_id: record.branch_id, shift_id: record.shift_id,
+      amount: paid, method: record.pay_method, created_by: currentUser.name,
+      created_at: now(), updated_at: now(), deleted: 0
+    });
+  }
+
+  cart = [];
+  renderCart();
+  document.getElementById('inv-customer-name').value='';
+  document.getElementById('inv-customer-phone').value='';
+  document.getElementById('inv-discount').value=0;
+  document.getElementById('inv-vat').checked=false;
+  document.getElementById('inv-paid').value=0;
+  await refreshInvoices();
+  if(navigator.onLine) syncNow();
+  // الفاتورة اتحفظت خلاص فوق (idbPut) قبل السطر ده -- الحفظ بيحصل تلقائي دايماً.
+  // بعد كده بنفتح شاشة تفاصيل الفاتورة نفسها عشان الكاشير يختار أي زرار طباعة
+  // من التلاتة (رصيد مفصل / رصيد الأوردر / استيكر) يناسب الحالة.
+  showToast('تم حفظ الفاتورة رقم ' + record.invoice_number + ' بنجاح ✅', 'success');
+  viewInvoiceDetails(record.id);
+  } finally {
+    saveBtn.disabled = false;
+  }
+};
+
+// ============================================================
+// عرض الفواتير
+// ============================================================
+let allInvoicesCache = [];
+
+// افتراضياً القائمة بتعرض بس فواتير النهارده، عشان الكاشير اللي فاتح شفت جديد
+// ميلاقيش قدامه فواتير الأيام اللي فاتت. لو حب يشوف تاريخ تاني يقدر يدور بالتواريخ
+// فوق، أو يدوس "كل الفواتير" عشان يشيل الفلتر ده تماماً.
+function applyDefaultInvoiceDateFilter(){
+  if(invoicesDateFilterTouched) return;
+  const todayStr = new Date().toISOString().slice(0,10);
+  document.getElementById('invoices-start-date').value = todayStr;
+  document.getElementById('invoices-end-date').value = todayStr;
+}
+
+async function refreshInvoices(){
+  allInvoicesCache = (await idbAll('invoices')).sort((a,b)=>b.created_at-a.created_at);
+  renderInvoicesTable();
+}
+
+function renderInvoicesTable(){
+  const tbody = document.getElementById('invoices-body');
+  const query = (document.getElementById('invoices-search').value || '').trim().toLowerCase();
+  const startDateVal = document.getElementById('invoices-start-date').value;
+  const endDateVal = document.getElementById('invoices-end-date').value;
+  const cashierFilter = document.getElementById('invoices-cashier-me').checked ? 'me' : 'all';
+
+  let filtered = allInvoicesCache;
+
+  if(cashierFilter === 'me'){
+    filtered = filtered.filter(inv=>shiftCashierUserId(inv.shift_id) === currentUser?.id);
+  }
+  if(query){
+    filtered = filtered.filter(inv=>
+      (inv.customer_phone||'').toLowerCase().includes(query) ||
+      String(inv.invoice_number ?? '').includes(query)
+    );
+  }
+  if(startDateVal){
+    const startMs = new Date(startDateVal + 'T00:00:00').getTime();
+    filtered = filtered.filter(inv=>inv.created_at >= startMs);
+  }
+  if(endDateVal){
+    const endMs = new Date(endDateVal + 'T23:59:59').getTime();
+    filtered = filtered.filter(inv=>inv.created_at <= endMs);
+  }
+
+  document.getElementById('invoices-empty').style.display = filtered.length? 'none':'block';
+  tbody.innerHTML = filtered.map(inv=>{
+    // علم "synced" صريح بدل مقارنة التوقيت مع آخر مزامنة، عشان فروق ساعة
+    // السيرفر/الجهاز ممكن تدي نتيجة غلط لو اعتمدنا على التوقيت بس.
+    const isSynced = Number(inv.synced) === 1;
+    const statusBadge = isSynced
+      ? `<span class="badge synced">متزامن</span>`
+      : `<span class="badge pending">بانتظار المزامنة</span>`;
+    const adminBtns = currentUser.role==='admin'
+      ? `<button class="btn small secondary" onclick="openEditInvoice('${inv.id}')">تعديل</button>
+         <button class="btn small danger" onclick="deleteInvoice('${inv.id}')">حذف</button>`
+      : '';
+    const addMoneyBtn = inv.remaining > 0
+      ? `<button class="btn small" onclick="openAddPayment('${inv.id}')">إضافة المال</button>`
+      : '';
+    const deliveredChecked = inv.status==='delivered' ? 'checked' : '';
+    // بمجرد ما حد (كاشير أو مدير) يعلّم إن الفاتورة اتسلمت، التشيك بوكس بتقفل لأي حد
+    // غير المدير، ومينفعش يترجع "لم يتم التسليم" تاني غير من حساب المدير.
+    const deliveredLocked = inv.status==='delivered' && currentUser.role!=='admin';
+    return `
+    <tr>
+      <td>${inv.invoice_number ?? '-'}</td>
+      <td>${inv.customer_name}</td>
+      <td>${inv.customer_phone||'-'}</td>
+      <td>${branchName(inv.branch_id)}</td>
+      <td>${shiftCashierName(inv.shift_id)}</td>
+      <td>${inv.total_cost.toFixed(2)}</td>
+      <td>${inv.remaining.toFixed(2)}</td>
+      <td>${inv.status==='delivered'?'تم التسليم':'لم يتم التسليم'}</td>
+      <td style="text-align:center;">
+        <input type="checkbox" ${deliveredChecked} ${deliveredLocked?'disabled':''} onchange="toggleDelivered('${inv.id}', this.checked)" style="width:18px; height:18px; cursor:${deliveredLocked?'not-allowed':'pointer'};">
+      </td>
+      <td>${statusBadge}</td>
+      <td>${new Date(inv.created_at).toLocaleString('ar-EG')}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn small secondary" onclick="viewInvoiceDetails('${inv.id}')">عرض التفاصيل</button>
+        ${addMoneyBtn}
+        ${adminBtns}
+      </td>
+    </tr>`;
+  }).join('');
+}
+document.getElementById('invoices-search').addEventListener('input', renderInvoicesTable);
+document.getElementById('invoices-start-date').addEventListener('change', ()=>{ invoicesDateFilterTouched = true; renderInvoicesTable(); });
+document.getElementById('invoices-end-date').addEventListener('change', ()=>{ invoicesDateFilterTouched = true; renderInvoicesTable(); });
+document.getElementById('invoices-cashier-me').addEventListener('change', renderInvoicesTable);
+document.getElementById('invoices-cashier-all').addEventListener('change', renderInvoicesTable);
+document.getElementById('invoices-today-btn').onclick = ()=>{
+  invoicesDateFilterTouched = true;
+  const todayStr = new Date().toISOString().slice(0,10);
+  document.getElementById('invoices-start-date').value = todayStr;
+  document.getElementById('invoices-end-date').value = todayStr;
+  renderInvoicesTable();
+};
+document.getElementById('invoices-clear-dates-btn').onclick = ()=>{
+  invoicesDateFilterTouched = true;
+  document.getElementById('invoices-start-date').value = '';
+  document.getElementById('invoices-end-date').value = '';
+  renderInvoicesTable();
+};
+
+// تبديل حالة "تم التسليم": أي مستخدم (كاشير أو مدير) يقدر يعلّمها أول مرة،
+// لكن بمجرد ما تتعلّم "تم التسليم" بتقفل، ومينفعش حد يرجّعها "لم يتم التسليم"
+// غير المدير بس. الشرط ده متأكد منه هنا كمان (مش بس بتعطيل التشيك بوكس في الواجهة)
+// عشان يفضل الحال ده حتى لو حصل أي تلاعب في الـ DOM.
+window.toggleDelivered = async (id, isChecked)=>{
+  const inv = allInvoicesCache.find(x=>x.id===id);
+  if(!inv) return;
+  if(inv.status==='delivered' && currentUser.role!=='admin'){
+    await refreshInvoices(); // نرجّع الشكل الصح للتشيك بوكس لو حصلت محاولة تغيير
+    return;
+  }
+  inv.status = isChecked ? 'delivered' : 'not Delivered';
+  inv.updated_at = now();
+  inv.synced = 0;
+  await idbPut('invoices', inv);
+  await refreshInvoices();
+  if(navigator.onLine) syncNow();
+};
+
+// ============================================================
+// إضافة تحصيل من المبلغ المتبقي في فاتورة
+// ============================================================
+let payingInvoiceId = null;
+window.openAddPayment = (id)=>{
+  const inv = allInvoicesCache.find(x=>x.id===id);
+  if(!inv || inv.remaining<=0) return;
+  payingInvoiceId = id;
+  document.getElementById('apm-total').textContent = inv.total_cost.toFixed(2) + ' ج.م';
+  document.getElementById('apm-paid-before').textContent = inv.paid.toFixed(2) + ' ج.م';
+  document.getElementById('apm-remaining-before').textContent = inv.remaining.toFixed(2) + ' ج.م';
+  document.getElementById('apm-amount').value = inv.remaining.toFixed(2);
+  document.getElementById('apm-amount').max = inv.remaining;
+  document.getElementById('apm-pay-method').value = inv.pay_method || 'cash';
+  document.getElementById('apm-error').style.display = 'none';
+  document.getElementById('add-payment-modal').classList.add('active');
+};
+document.getElementById('apm-cancel').onclick = ()=>document.getElementById('add-payment-modal').classList.remove('active');
+document.getElementById('apm-save').onclick = async ()=>{
+  const inv = allInvoicesCache.find(x=>x.id===payingInvoiceId);
+  if(!inv) return;
+  const amount = parseFloat(document.getElementById('apm-amount').value);
+  const errBox = document.getElementById('apm-error');
+  if(isNaN(amount) || amount<=0){
+    errBox.textContent = 'اكتب مبلغ صحيح';
+    errBox.style.display = 'block';
+    return;
+  }
+  if(toCents(amount) > toCents(inv.remaining)){
+    errBox.textContent = 'المبلغ المُدخل أكبر من المتبقي (' + inv.remaining.toFixed(2) + ' ج.م)';
+    errBox.style.display = 'block';
+    return;
+  }
+  errBox.style.display = 'none';
+
+  inv.paid = centsToNumber(toCents(inv.paid) + toCents(amount));
+  inv.remaining = centsToNumber(toCents(inv.total_cost) - toCents(inv.paid));
+  inv.pay_method = document.getElementById('apm-pay-method').value;
+  inv.status = inv.remaining<=0 ? 'delivered' : 'not Delivered';
+  inv.updated_at = now();
+  inv.synced = 0;
+
+  await idbPut('invoices', inv);
+
+  // أهم نقطة هنا: التحصيل ده بيتسجل على الشفت المفتوح دلوقتي (اللي بيتحصّل فيه
+  // فعلياً)، مش على شفت الفاتورة الأصلي (اللي ممكن يكون اتقفل من زمان). ده اللي
+  // بيخلي الفلوس دي تدخل صح في حساب الكاش وقت قفل الشفت الحالي وفي التقارير،
+  // بدل ما "تضيع" على شفت مقفول أو تتحسب في اليوم/الشفت الغلط.
+  const paymentShiftId = currentShift?.id || inv.shift_id;
+  await idbPut('payments', {
+    id: uid(), invoice_id: inv.id, branch_id: inv.branch_id, shift_id: paymentShiftId,
+    amount, method: inv.pay_method, created_by: currentUser.name,
+    created_at: now(), updated_at: now(), deleted: 0
+  });
+
+  document.getElementById('add-payment-modal').classList.remove('active');
+  await refreshInvoices();
+  if(navigator.onLine) syncNow();
+};
+
+window.deleteInvoice = async (id)=>{
+  if(currentUser.role!=='admin') return; // حماية إضافية، الزرار أصلاً مش ظاهر لغير المدير
+  if(!confirm('متأكد إنك عايز تحذف الفاتورة دي؟ الإجراء ده مش هينفع يتراجع فيه.')) return;
+  const inv = allInvoicesCache.find(x=>x.id===id);
+  if(!inv) return;
+  inv.deleted = 1;
+  inv.updated_at = now();
+  inv.synced = 0;
+  await idbPut('invoices', inv);
+
+  // بنحذف أي تحصيلات مسجلة على الفاتورة دي برضه، عشان مايفضلش فلوس منسوبة
+  // لشفت معين من غير ما يكون ليها فاتورة حقيقية وراها (يبوّظ حساب الشفت).
+  const relatedPayments = (await idbAll('payments')).filter(p=>p.invoice_id===id);
+  for(const p of relatedPayments){
+    p.deleted = 1; p.updated_at = now();
+    await idbPut('payments', p);
+  }
+
+  await refreshInvoices();
+  if(navigator.onLine) syncNow();
+};
+
+// ============================================================
+// عرض تفاصيل فاتورة (متاح للكل)
+// ============================================================
+let currentDetailsInvoiceId = null;
+
+window.viewInvoiceDetails = (id)=>{
+  const inv = allInvoicesCache.find(x=>x.id===id);
+  if(!inv) return;
+  currentDetailsInvoiceId = id;
+  document.getElementById('invoice-details-title').textContent = 'تفاصيل الفاتورة #' + (inv.invoice_number ?? '-');
+  const items = JSON.parse(inv.items_json || '[]');
+  const itemsRows = items.map(it=>`
+    <div class="summary-row"><span>${it.name} × ${it.qty}</span><span>${(it.price*it.qty).toFixed(2)} ج.م</span></div>
+  `).join('');
+  document.getElementById('invoice-details-body').innerHTML = `
+    <div class="summary-row"><span>رقم الفاتورة</span><span>${inv.invoice_number ?? '-'}</span></div>
+    <div class="summary-row"><span>العميل</span><span>${inv.customer_name}</span></div>
+    <div class="summary-row"><span>الهاتف</span><span>${inv.customer_phone||'-'}</span></div>
+    <div class="summary-row"><span>الفرع</span><span>${branchName(inv.branch_id)}</span></div>
+    <div style="margin:14px 0 6px; font-weight:700; font-size:13px; color:var(--muted);">الأصناف</div>
+    ${itemsRows || '<div class="empty">لا توجد أصناف</div>'}
+    <div class="summary-row"><span>الخصم</span><span>${inv.discount_percent||0}%</span></div>
+    ${inv.vat_amount>0 ? `<div class="summary-row"><span>ضريبة القيمة المضافة (${inv.vat_percent||14}%)</span><span>${inv.vat_amount.toFixed(2)} ج.م</span></div>` : ''}
+    <div class="summary-row"><span>المدفوع</span><span>${inv.paid.toFixed(2)} ج.م</span></div>
+    <div class="summary-row"><span>طريقة الدفع</span><span>${inv.pay_method}</span></div>
+    <div class="summary-row"><span>الحالة</span><span>${inv.status==='delivered'?'تم التسليم':'لم يتم التسليم'}</span></div>
+    <div class="summary-row"><span>بواسطة</span><span>${inv.created_by||'-'}</span></div>
+    <div class="summary-row"><span>الكاشير فاتح الشفت</span><span>${shiftCashierName(inv.shift_id)}</span></div>
+    <div class="summary-row total"><span>الإجمالي</span><span>${inv.total_cost.toFixed(2)} ج.م</span></div>
+  `;
+  document.getElementById('invoice-details-modal').classList.add('active');
+};
+document.getElementById('idm-close').onclick = ()=>document.getElementById('invoice-details-modal').classList.remove('active');
+document.getElementById('idm-print-detailed').onclick = ()=>printDetailedReceipt(currentDetailsInvoiceId);
+document.getElementById('idm-print-amount').onclick = ()=>printAmountReceipt(currentDetailsInvoiceId);
+document.getElementById('idm-print-sticker').onclick = ()=>printSticker(currentDetailsInvoiceId);
+
+// ============================================================
+// طباعة الإيصالات (رصيد مفصل / رصيد الأوردر / استيكر)
+// كل الإيصالات دي مشتركة في نفس الترويسة: اسم Kodak Pixel فوق، وبعده
+// كود الأوردر واسم العميل ورقم هاتفه.
+// ============================================================
+function receiptHeaderHtml(inv){
+  return `
+    <div style="text-align:center; font-weight:800; font-size:24px; margin-bottom:4px; font-family:Cairo,Arial,sans-serif;">
+      Kodak<span style="color:#E4212B;">Pixel</span>
+    </div>
+    <div style="text-align:center; font-size:13px; color:#444; margin-bottom:16px; border-bottom:1px solid #ddd; padding-bottom:10px;">
+      كود الأوردر: <b>${inv.invoice_number ?? '-'}</b> &nbsp;|&nbsp;
+      العميل: <b>${inv.customer_name}</b> &nbsp;|&nbsp;
+      الهاتف: <b>${inv.customer_phone || '-'}</b>
+    </div>`;
+}
+
+// قائمة عناوين الفروع بتتاخد من شاشة "الفروع" نفسها (اسم + عنوان)، عشان
+// تفضل محدّثة تلقائياً من غير ما نكتبها يدوي في كل إيصال.
+function receiptBranchesBlockHtml(){
+  const withAddress = (allBranches||[]).filter(b=>b.address);
+  if(withAddress.length===0) return '';
+  const rows = withAddress.map((b,i)=>`<div style="margin-bottom:6px;">${i+1}. ${b.name} — ${b.address}</div>`).join('');
+  return `<div style="border:1px solid #ccc; border-radius:6px; padding:14px; margin-top:20px; font-size:12px; color:#333;">
+    <div style="font-weight:700; margin-bottom:8px;">عناويننا:</div>${rows}
+  </div>`;
+}
+
+function receiptFooterHtml(){
+  return `<div style="text-align:center; margin-top:20px; font-size:12px; color:#555;">شكراً لتعاملكم مع Kodak Pixel</div>`;
+}
+
+// صف الضريبة بيظهر بس لو الفاتورة فعلاً فيها ضريبة مطبقة (vat_amount > 0)
+function receiptVatRowHtml(inv){
+  if(!inv.vat_amount || inv.vat_amount<=0) return '';
+  return `<tr><td>ضريبة القيمة المضافة (${inv.vat_percent||14}%)</td><td>${inv.vat_amount.toFixed(2)} ج.م</td></tr>`;
+}
+
+function buildDetailedReceiptHtml(inv){
+  const items = JSON.parse(inv.items_json || '[]');
+  const itemsRows = items.map(it=>`
+    <tr><td>${it.name}</td><td>${it.qty}</td><td>${it.price.toFixed(2)}</td><td>${(it.price*it.qty).toFixed(2)}</td></tr>
+  `).join('');
+  return `
+    ${receiptHeaderHtml(inv)}
+    <div style="margin-bottom:14px; font-size:14px; line-height:1.9;">
+      <div><b>رقم الفاتورة:</b> ${inv.invoice_number ?? '-'}</div>
+      <div><b>التاريخ:</b> ${new Date(inv.created_at).toLocaleString('ar-EG')}</div>
+      <div><b>الفرع:</b> ${branchName(inv.branch_id)}</div>
+      <div><b>العميل:</b> ${inv.customer_name}</div>
+      <div><b>الهاتف:</b> ${inv.customer_phone || '-'}</div>
+    </div>
+    <table>
+      <thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
+      <tbody>${itemsRows || '<tr><td colspan="4">لا توجد أصناف</td></tr>'}</tbody>
+    </table>
+    <table style="margin-top:12px;">
+      ${receiptVatRowHtml(inv)}
+      <tr><td style="font-weight:700;">الإجمالي</td><td>${inv.total_cost.toFixed(2)} ج.م</td></tr>
+      <tr><td style="font-weight:700;">المدفوع</td><td>${inv.paid.toFixed(2)} ج.م</td></tr>
+      <tr><td style="font-weight:700;">المتبقي</td><td>${inv.remaining.toFixed(2)} ج.م</td></tr>
+      <tr><td style="font-weight:700;">طريقة الدفع</td><td>${inv.pay_method}</td></tr>
+    </table>
+    ${receiptBranchesBlockHtml()}
+    ${receiptFooterHtml()}
+  `;
+}
+
+function buildAmountReceiptHtml(inv){
+  return `
+    ${receiptHeaderHtml(inv)}
+    <table>
+      ${receiptVatRowHtml(inv)}
+      <tr><td style="font-weight:700;">الإجمالي</td><td>${inv.total_cost.toFixed(2)} ج.م</td></tr>
+      <tr><td style="font-weight:700;">المدفوع</td><td>${inv.paid.toFixed(2)} ج.م</td></tr>
+      <tr><td style="font-weight:700;">المتبقي</td><td>${inv.remaining.toFixed(2)} ج.م</td></tr>
+      <tr><td style="font-weight:700;">طريقة الدفع</td><td>${inv.pay_method}</td></tr>
+    </table>
+    ${receiptFooterHtml()}
+  `;
+}
+
+function buildStickerHtml(inv){
+  return `
+    <div style="width:280px; text-align:center; border:2px dashed #999; border-radius:10px; padding:16px; margin:0 auto; font-family:Cairo,Arial,sans-serif;">
+      <div style="font-weight:800; font-size:16px; margin-bottom:10px;">Kodak<span style="color:#E4212B;">Pixel</span></div>
+      <div style="font-size:22px; font-weight:800; margin-bottom:8px;">#${inv.invoice_number ?? '-'}</div>
+      <div style="font-size:16px; margin-bottom:4px;">${inv.customer_name}</div>
+      <div style="font-size:14px; color:#555;">${inv.customer_phone || '-'}</div>
+    </div>
+  `;
+}
+
+// بيفتح نافذة جديدة فيها الإيصال جاهز للطباعة (window.print())، عشان الطباعة
+// تشتغل بشكل منفصل عن الشاشة الأساسية ومن غير ما تتأثر بتنسيق الصفحة الرئيسية.
+function openPrintWindow(bodyHtml, title){
+  const win = window.open('', '_blank', 'width=440,height=640');
+  if(!win){ alert('المتصفح منع فتح نافذة الطباعة، اسمح بالنوافذ المنبثقة (popups) لهذا الموقع وحاول تاني'); return; }
+  win.document.write(`<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>${title}</title>
+    <style>
+      body{font-family:Cairo,Arial,sans-serif; padding:20px; color:#111;}
+      table{width:100%; border-collapse:collapse; margin:10px 0;}
+      th, td{border:1px solid #ccc; padding:6px 10px; text-align:right; font-size:14px;}
+      th{background:#f0f0f0;}
+    </style>
+  </head><body>${bodyHtml}</body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>{ win.print(); }, 300);
+}
+
+window.printDetailedReceipt = (id)=>{
+  const inv = allInvoicesCache.find(x=>x.id===id);
+  if(!inv) return;
+  openPrintWindow(buildDetailedReceiptHtml(inv), 'رصيد مفصل - ' + (inv.invoice_number ?? ''));
+};
+window.printAmountReceipt = (id)=>{
+  const inv = allInvoicesCache.find(x=>x.id===id);
+  if(!inv) return;
+  openPrintWindow(buildAmountReceiptHtml(inv), 'رصيد الأوردر - ' + (inv.invoice_number ?? ''));
+};
+window.printSticker = (id)=>{
+  const inv = allInvoicesCache.find(x=>x.id===id);
+  if(!inv) return;
+  openPrintWindow(buildStickerHtml(inv), 'استيكر - ' + (inv.invoice_number ?? ''));
+};
+
+// ============================================================
+// تعديل فاتورة (للمدير فقط)
+// ============================================================
+let editingInvoiceId = null;
+window.openEditInvoice = (id)=>{
+  if(currentUser.role!=='admin') return; // حماية إضافية، الزرار أصلاً مش ظاهر لغير المدير
+  const inv = allInvoicesCache.find(x=>x.id===id);
+  if(!inv) return;
+  editingInvoiceId = id;
+  document.getElementById('iem-customer-name').value = inv.customer_name || '';
+  document.getElementById('iem-customer-phone').value = inv.customer_phone || '';
+  document.getElementById('iem-discount').value = inv.discount_percent || 0;
+  document.getElementById('iem-vat').checked = !!(inv.vat_percent && inv.vat_percent > 0);
+  document.getElementById('iem-pay-method').value = inv.pay_method || 'cash';
+  document.getElementById('iem-paid').value = inv.paid || 0;
+  document.getElementById('iem-status').value = inv.status || 'not Delivered';
+  document.getElementById('invoice-edit-modal').classList.add('active');
+};
+document.getElementById('iem-cancel').onclick = ()=>document.getElementById('invoice-edit-modal').classList.remove('active');
+document.getElementById('iem-save').onclick = async ()=>{
+  if(currentUser.role!=='admin') return;
+  const inv = allInvoicesCache.find(x=>x.id===editingInvoiceId);
+  if(!inv) return;
+
+  const items = JSON.parse(inv.items_json || '[]');
+  const subtotal = safeSumFinancials(items, it=>it.price*it.qty);
+  const discount = Math.min(100, Math.max(0, parseFloat(document.getElementById('iem-discount').value)||0));
+  const afterDiscount = centsToNumber(Math.round(toCents(subtotal) * (1 - discount/100)));
+  const vatApplied = document.getElementById('iem-vat').checked;
+  const vatAmount = vatApplied ? centsToNumber(Math.round(toCents(afterDiscount) * (VAT_PERCENT/100))) : 0;
+  const total = centsToNumber(toCents(afterDiscount) + toCents(vatAmount));
+  const paid = centsToNumber(toCents(document.getElementById('iem-paid').value));
+  const remaining = centsToNumber(toCents(total) - toCents(paid));
+  const oldPaidCents = toCents(inv.paid);
+  const newPayMethod = document.getElementById('iem-pay-method').value;
+
+  inv.customer_name = document.getElementById('iem-customer-name').value.trim() || 'عميل';
+  inv.customer_phone = document.getElementById('iem-customer-phone').value.trim();
+  inv.discount_percent = discount;
+  inv.vat_percent = vatApplied ? VAT_PERCENT : 0;
+  inv.vat_amount = vatAmount;
+  inv.pay_method = newPayMethod;
+  inv.paid = paid;
+  inv.total_cost = total;
+  inv.remaining = remaining;
+  inv.status = document.getElementById('iem-status').value;
+  inv.updated_at = now();
+  inv.synced = 0; // التعديل محتاج يتزامن تاني
+
+  await idbPut('invoices', inv);
+
+  // لو المدير غيّر "المدفوع" يدوي (زوّده أو نقّصه)، بنسجل الفرق في سجل التحصيلات
+  // على الشفت المفتوح دلوقتي، عشان الكاش المحسوب وقت القفل والتقارير يفضل مطابق
+  // لأي تعديل يدوي بدل ما يحصل تعارض بين رقم الفاتورة وسجل التحصيلات.
+  const deltaCents = toCents(paid) - oldPaidCents;
+  if(deltaCents !== 0){
+    await idbPut('payments', {
+      id: uid(), invoice_id: inv.id, branch_id: inv.branch_id, shift_id: currentShift?.id || inv.shift_id,
+      amount: centsToNumber(deltaCents), method: newPayMethod, created_by: currentUser.name,
+      created_at: now(), updated_at: now(), deleted: 0, note: 'تعديل يدوي من المدير'
+    });
+  }
+
+  document.getElementById('invoice-edit-modal').classList.remove('active');
+  await refreshInvoices();
+  if(navigator.onLine) syncNow();
+};
+
+// ============================================================
+// بدء التشغيل
+// ============================================================
+async function refreshAll(){
+  await refreshBranches();
+  await refreshProducts();
+  await refreshShiftsCache();
+  await refreshInvoices();
+  await refreshExpenses();
+  await refreshAdvances();
+  if(currentUser?.role==='admin'){
+    await refreshUsers();
+    await refreshSalaries();
+    refreshReportBranchSelect();
+    if(!document.getElementById('rep-start').value){
+      reportQuickRange('today');
+    }
+  }
+}
+
+document.getElementById('syncBtn').onclick = syncNow;
+
+(async function init(){
+  try{
+    if(!window.indexedDB) throw new Error('المتصفح ده مش بيدعم IndexedDB خالص. جرب Chrome أو Edge محدّث.');
+    if(!window.crypto || !window.crypto.subtle) throw new Error('crypto.subtle مش متاح. النظام لازم يتفتح من رابط https:// أو http://localhost — مش بضغطتين على الملف مباشرة.');
+
+    applyDefaultInvoiceDateFilter();
+    await openDB();
+    // فرع افتراضي أول مرة تشتغل فيها لو مفيش فروع
+    const existingBranches = await idbAll('branches');
+    let defaultBranchId = existingBranches[0]?.id;
+    if(existingBranches.length===0){
+      defaultBranchId = uid();
+      await idbPut('branches', {id: defaultBranchId, name:'الفرع الرئيسي', address:'', updated_at: now(), deleted:0});
+    }
+    // بذر المنتجات القياسية تلقائياً لو النظام لسه ما فيهوش أي منتج خالص
+    const existingProducts = await idbAll('products');
+    if(existingProducts.length===0){
+      await seedStandardProductsOnce(defaultBranchId);
+    }
+    await ensureDefaultAdmin();
+
+    const savedUserId = localStorage.getItem('kp_current_user_id');
+    if(savedUserId){
+      const users = await idbAll('users');
+      const user = users.find(u=>u.id===savedUserId);
+      if(user){
+        currentUser = user;
+        document.getElementById('login-overlay').classList.add('hidden');
+        await afterLogin();
+        return;
+      }
+    }
+    // مفيش جلسة محفوظة -> اعرض شاشة الدخول
+    document.getElementById('login-overlay').classList.remove('hidden');
+  }catch(err){
+    console.error('Startup error:', err);
+    const box = document.getElementById('startup-error');
+    box.textContent = 'حصل خطأ عند تشغيل النظام: ' + err.message;
+    box.style.display = 'block';
+    document.getElementById('login-overlay').classList.remove('hidden');
+  }
+})();
+</script>
+</body>
+</html>
