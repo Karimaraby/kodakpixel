@@ -808,10 +808,10 @@ function safeSumFinancials(items, getVal){
 // أو تتحسب غلط على الشفت الأول اللي كان لسه مقفول.
 async function computeShiftFinancials(shiftId){
   const allInvoices = await idbAll('invoices');
-  const invoices = allInvoices.filter(i=>i.shift_id===shiftId && !i.deleted);
-  const expenses = (await idbAll('expenses')).filter(e=>e.shift_id===shiftId && !e.deleted);
-  const advances = (await idbAll('advances')).filter(a=>a.shift_id===shiftId && !a.deleted);
-  const payments = (await idbAll('payments')).filter(p=>p.shift_id===shiftId && !p.deleted);
+  const invoices = allInvoices.filter(i=>i.shift_id===shiftId);
+  const expenses = (await idbAll('expenses')).filter(e=>e.shift_id===shiftId);
+  const advances = (await idbAll('advances')).filter(a=>a.shift_id===shiftId);
+  const payments = (await idbAll('payments')).filter(p=>p.shift_id===shiftId);
 
   const byMethod = {cash:0, visa:0, 'insta pay':0, wallet:0};
   for(const method of Object.keys(byMethod)){
@@ -835,27 +835,6 @@ async function computeShiftFinancials(shiftId){
     invoicesCount: invoices.length, totalSales, totalVat, totalPaid: totalCollected, byMethod,
     collectedOnOtherShiftsInvoices, totalExpenses, totalAdvances, netCash
   };
-}
-
-// لو شفت اتقفل خلاص، أرقامه (المبيعات/المصروفات/الكاش المتوقع) بتتحفظ "لقطة" وقت
-// القفل في summary_json، مش بتتحسب لايف زي الشفت المفتوح. المشكلة إن ده معناه لو
-// المدير حذف أو عدّل فاتورة/مصروف/سلفة بعد قفل الشفت، الأرقام المعروضة في تفاصيل
-// الشفت والتقارير مش بتتحدّث. الدالة دي بتعيد حساب الأرقام من البيانات الحالية
-// (بعد الحذف/التعديل) وتحدّث الـ summary_json، مع الحفاظ على "الكاش الفعلي" اللي
-// اتعدّ فعليًا في الدرج وقت القفل زي ما هو (ده رقم واقعي فعلي، مش بيتغيّر)،
-// وبتعيد حساب الفرق (variance) بناءً على الكاش المتوقع الجديد بعد التصحيح.
-async function recalcClosedShiftSummary(shiftId){
-  if(!shiftId) return;
-  const shift = (await idbAll('shifts')).find(s=>s.id===shiftId);
-  if(!shift || shift.status!=='closed' || !shift.summary_json) return;
-  const oldSummary = JSON.parse(shift.summary_json);
-  const fin = await computeShiftFinancials(shiftId);
-  const variance = centsToNumber(toCents(oldSummary.actualCash||0) - toCents(fin.netCash||0));
-  const summary = { ...fin, actualCash: oldSummary.actualCash, variance, closedAt: oldSummary.closedAt };
-  shift.summary_json = JSON.stringify(summary);
-  shift.updated_at = now();
-  await idbPut('shifts', shift);
-  if(navigator.onLine) syncNow();
 }
 
 async function hashPassword(plain){
@@ -1470,7 +1449,6 @@ window.deleteExpense = async (id)=>{
   e.deleted = 1; e.updated_at = now();
   await idbPut('expenses', e);
   await refreshExpenses();
-  await recalcClosedShiftSummary(e.shift_id);
   if(navigator.onLine) syncNow();
 };
 document.getElementById('add-expense-btn').onclick = ()=>{
@@ -1525,7 +1503,6 @@ window.deleteAdvance = async (id)=>{
   a.deleted = 1; a.updated_at = now();
   await idbPut('advances', a);
   await refreshAdvances();
-  await recalcClosedShiftSummary(a.shift_id);
   if(navigator.onLine) syncNow();
 };
 document.getElementById('add-advance-btn').onclick = async ()=>{
@@ -2475,7 +2452,6 @@ document.getElementById('apm-save').onclick = async ()=>{
 
   document.getElementById('add-payment-modal').classList.remove('active');
   await refreshInvoices();
-  await recalcClosedShiftSummary(inv.shift_id);
   if(navigator.onLine) syncNow();
 };
 
@@ -2498,7 +2474,6 @@ window.deleteInvoice = async (id)=>{
   }
 
   await refreshInvoices();
-  await recalcClosedShiftSummary(inv.shift_id);
   if(navigator.onLine) syncNow();
 };
 
@@ -2731,7 +2706,6 @@ document.getElementById('iem-save').onclick = async ()=>{
 
   document.getElementById('invoice-edit-modal').classList.remove('active');
   await refreshInvoices();
-  await recalcClosedShiftSummary(inv.shift_id);
   if(navigator.onLine) syncNow();
 };
 
