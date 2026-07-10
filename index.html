@@ -1916,6 +1916,7 @@ document.getElementById('ptm-save').onclick = async ()=>{
 };
 
 window.deletePartner = async (id)=>{
+  if(currentUser.role!=='admin') return; // حماية إضافية، الصفحة كلها أصلاً مش ظاهرة لغير المدير
   if(!confirm('متأكد إنك عايز تحذف الشريك ده؟')) return;
   const p = (await idbAll('partners')).find(x=>x.id===id);
   if(!p) return;
@@ -1976,6 +1977,7 @@ document.getElementById('pcm-save').onclick = async ()=>{
 };
 
 window.deletePartnerCapital = async (id)=>{
+  if(currentUser.role!=='admin') return; // حماية إضافية، الصفحة كلها أصلاً مش ظاهرة لغير المدير
   if(!confirm('متأكد إنك عايز تحذف السجل ده؟')) return;
   const c = (await idbAll('partner_capital')).find(x=>x.id===id);
   if(!c) return;

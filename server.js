@@ -1,12 +1,28 @@
 // سيرفر كوداك بيكسل - نظام الكاشير
 // المسؤول عن: تخزين البيانات المركزية + استقبال المزامنة من كل الفروع
+//
+// ملحوظة مهمة عن قاعدة البيانات: النسخة دي بتستخدم Postgres (زي اللي بتوفره
+// خدمة Supabase مجاناً وبشكل دائم) بدل ملف SQLite محلي. السبب: الاستضافات
+// المجانية (زي Render Free) بتمسح أي ملفات محفوظة على السيرفر نفسه كل ما
+// السيرفر يعيد تشغيل نفسه، فلو استخدمنا ملف SQLite هناك، بياناتك (الفواتير
+// والعملاء) كانت هتتمسح بشكل دوري. بربط السيرفر بقاعدة بيانات خارجية دائمة
+// (Supabase) بدل ملف محلي، البيانات بتفضل محفوظة حتى لو Render نفسه اتقفل
+// وفتح تاني أو عمل إعادة تشغيل.
 
 const express = require('express');
 const cors = require('cors');
-const Database = require('better-sqlite3');
-const path = require('path');
+const { Pool, types } = require('pg');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const path = require('path');
+
+// بشكل افتراضي، مكتبة pg بترجع أعمدة BIGINT (زي أعمدة التاريخ/الوقت عندنا،
+// اللي مخزّنة كميلي ثانية) كـ"نص" مش رقم، عشان أرقام BIGINT ممكن تكون أكبر
+// من أكبر رقم JavaScript يقدر يمثله بدقة. بس التواريخ عندنا (ميلي ثانية منذ
+// 1970) بعيدة جداً عن الحد ده، فمأمون نخليها ترجع كأرقام عادية. من غير التعديل
+// ده، أي كود في الواجهة بيستخدم new Date(inv.created_at) كان هيطلع "Invalid
+// Date" لإن الفرونت إند بيتوقع رقم مش نص.
+types.setTypeParser(20, (val) => parseInt(val, 10)); // 20 = OID بتاع BIGINT
 
 const app = express();
 // السيرفر بيشتغل ورا بروكسي الاستضافة (زي Render)، فبنثق في هيدر X-Forwarded-For
@@ -16,20 +32,31 @@ app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// مسار قاعدة البيانات: تقدر تحدده عن طريق متغير بيئة KODAK_DB_PATH (مفيد لو
-// عندك "قرص دائم" (Persistent Disk) في خدمة الاستضافة، عشان بياناتك تفضل
-// موجودة حتى لو السيرفر اتعمله إعادة تشغيل أو تحديث). لو مش محدد، بيستخدم
-// المسار الافتراضي جنب server.js زي ما كان.
-const dbPath = process.env.KODAK_DB_PATH || path.join(__dirname, 'kodak-pixel.db');
-const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
-
 // السيرفر ده بيقدّم واجهة الكاشير (الفرونت إند) هو نفسه، عشان الموقع كله يبقى
 // "حاجة واحدة" على رابط واحد: تكتب عنوان السيرفر في المتصفح، وتلاقي الكاشير
 // شغال على طول، من غير ما تحتاج تفتح ملف الواجهة منفصل. لو عايز تحط الفرونت
 // إند مكان تاني، غيّر المسار ده بس.
 const FRONTEND_DIR = process.env.KODAK_FRONTEND_DIR || path.join(__dirname, '..', 'frontend');
 app.use(express.static(FRONTEND_DIR));
+
+// رابط الاتصال بقاعدة البيانات (Postgres) - لازم يتحدد من متغير بيئة
+// DATABASE_URL (بتجيبه من صفحة الإعدادات في Supabase، اسمه "Connection string").
+// لو مش موجود، السيرفر مش هيشتغل خالص ويوقف بتحذير واضح، أحسن من ما يشتغل
+// ويحاول يتصل بحاجة مش موجودة.
+if (!process.env.DATABASE_URL) {
+  console.error('❌ خطأ: متغير البيئة DATABASE_URL مش متحدد. اتأكد إنك حاطط رابط');
+  console.error('   الاتصال بقاعدة بيانات Supabase في إعدادات البيئة (Environment');
+  console.error('   Variables) في Render قبل ما تشغّل السيرفر.');
+  process.exit(1);
+}
+
+// Supabase بيتطلب اتصال مشفّر (SSL). rejectUnauthorized:false هنا معناها بنقبل
+// شهادة Supabase من غير ما نحتاج نضيف شهادات إضافية يدوياً - ده الإعداد
+// القياسي المتبع مع خدمات الاستضافة المُدارة زي Supabase وRender وHeroku.
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false },
+});
 
 // السر المستخدم لتوقيع توكنات الدخول (JWT). في بيئة الإنتاج الحقيقية لازم يتحدد
 // من متغير بيئة JWT_SECRET بقيمة عشوائية طويلة، مش القيمة الافتراضية دي.
@@ -52,13 +79,13 @@ function sha256Hex(str) {
   return crypto.createHash('sha256').update(str, 'utf8').digest('hex');
 }
 
-// ============ إنشاء الجداول ============
-db.exec(`
+// ============ إنشاء الجداول (لو مش موجودة بالفعل) ============
+const SETUP_SQL = `
 CREATE TABLE IF NOT EXISTS branches (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   address TEXT,
-  updated_at INTEGER NOT NULL,
+  updated_at BIGINT NOT NULL,
   deleted INTEGER DEFAULT 0
 );
 
@@ -66,10 +93,10 @@ CREATE TABLE IF NOT EXISTS products (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   code TEXT,
-  price REAL NOT NULL,
+  price DOUBLE PRECISION NOT NULL,
   branch_id TEXT,
-  stock_qty REAL DEFAULT 0,
-  updated_at INTEGER NOT NULL,
+  stock_qty DOUBLE PRECISION DEFAULT 0,
+  updated_at BIGINT NOT NULL,
   deleted INTEGER DEFAULT 0
 );
 
@@ -80,18 +107,18 @@ CREATE TABLE IF NOT EXISTS invoices (
   customer_name TEXT,
   customer_phone TEXT,
   items_json TEXT NOT NULL,
-  discount_percent REAL DEFAULT 0,
-  vat_percent REAL DEFAULT 0,
-  vat_amount REAL DEFAULT 0,
-  total_cost REAL NOT NULL,
-  paid REAL DEFAULT 0,
-  remaining REAL DEFAULT 0,
+  discount_percent DOUBLE PRECISION DEFAULT 0,
+  vat_percent DOUBLE PRECISION DEFAULT 0,
+  vat_amount DOUBLE PRECISION DEFAULT 0,
+  total_cost DOUBLE PRECISION NOT NULL,
+  paid DOUBLE PRECISION DEFAULT 0,
+  remaining DOUBLE PRECISION DEFAULT 0,
   pay_method TEXT,
   status TEXT DEFAULT 'not Delivered',
   created_by TEXT,
   shift_id TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
   deleted INTEGER DEFAULT 0
 );
 
@@ -99,9 +126,9 @@ CREATE TABLE IF NOT EXISTS employees_attendance (
   id TEXT PRIMARY KEY,
   branch_id TEXT,
   employee_name TEXT,
-  check_in INTEGER,
-  check_out INTEGER,
-  updated_at INTEGER NOT NULL,
+  check_in BIGINT,
+  check_out BIGINT,
+  updated_at BIGINT NOT NULL,
   deleted INTEGER DEFAULT 0
 );
 
@@ -109,10 +136,10 @@ CREATE TABLE IF NOT EXISTS investments (
   id TEXT PRIMARY KEY,
   branch_id TEXT,
   investor_name TEXT,
-  amount REAL NOT NULL,
+  amount DOUBLE PRECISION NOT NULL,
   note TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
   deleted INTEGER DEFAULT 0
 );
 
@@ -123,8 +150,8 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'cashier',
   branch_id TEXT,
-  monthly_salary REAL DEFAULT 0,
-  updated_at INTEGER NOT NULL,
+  monthly_salary DOUBLE PRECISION DEFAULT 0,
+  updated_at BIGINT NOT NULL,
   deleted INTEGER DEFAULT 0
 );
 
@@ -133,11 +160,11 @@ CREATE TABLE IF NOT EXISTS shifts (
   branch_id TEXT,
   user_id TEXT,
   user_name TEXT,
-  opened_at INTEGER NOT NULL,
-  closed_at INTEGER,
+  opened_at BIGINT NOT NULL,
+  closed_at BIGINT,
   status TEXT DEFAULT 'open',
   summary_json TEXT,
-  updated_at INTEGER NOT NULL,
+  updated_at BIGINT NOT NULL,
   deleted INTEGER DEFAULT 0
 );
 
@@ -146,11 +173,11 @@ CREATE TABLE IF NOT EXISTS expenses (
   branch_id TEXT,
   shift_id TEXT,
   description TEXT,
-  amount REAL NOT NULL,
+  amount DOUBLE PRECISION NOT NULL,
   category TEXT,
   created_by TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
   deleted INTEGER DEFAULT 0
 );
 
@@ -160,13 +187,13 @@ CREATE TABLE IF NOT EXISTS advances (
   shift_id TEXT,
   employee_id TEXT,
   employee_name TEXT,
-  amount REAL NOT NULL,
+  amount DOUBLE PRECISION NOT NULL,
   note TEXT,
   created_by TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
   settled INTEGER DEFAULT 0,
-  settled_at INTEGER,
+  settled_at BIGINT,
   deleted INTEGER DEFAULT 0
 );
 
@@ -179,12 +206,12 @@ CREATE TABLE IF NOT EXISTS payments (
   invoice_id TEXT,
   branch_id TEXT,
   shift_id TEXT,
-  amount REAL NOT NULL,
+  amount DOUBLE PRECISION NOT NULL,
   method TEXT,
   note TEXT,
   created_by TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
   deleted INTEGER DEFAULT 0
 );
 
@@ -194,8 +221,8 @@ CREATE TABLE IF NOT EXISTS partners (
   id TEXT PRIMARY KEY,
   branch_id TEXT,
   name TEXT NOT NULL,
-  share_percent REAL NOT NULL DEFAULT 0,
-  updated_at INTEGER NOT NULL,
+  share_percent DOUBLE PRECISION NOT NULL DEFAULT 0,
+  updated_at BIGINT NOT NULL,
   deleted INTEGER DEFAULT 0
 );
 
@@ -206,38 +233,33 @@ CREATE TABLE IF NOT EXISTS partner_capital (
   id TEXT PRIMARY KEY,
   partner_id TEXT,
   branch_id TEXT,
-  amount REAL NOT NULL,
+  amount DOUBLE PRECISION NOT NULL,
   note TEXT,
   created_by TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL,
   deleted INTEGER DEFAULT 0
 );
-`);
 
-// فرض تفرّد اسم الدخول عبر كل الفروع (Fix A).
-// بنستخدم index لوحده بدل تعديل تعريف الجدول، عشان ده بيشتغل حتى لو الجدول
-// كان اتعمل قبل كده من نسخة سابقة (CREATE TABLE IF NOT EXISTS مش بيغيّر أعمدة موجودة).
-try {
-  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);`);
-} catch (err) {
-  console.warn('⚠️  تعذر فرض تفرّد اسم الدخول - على الأغلب فيه أسماء مكررة موجودة بالفعل:', err.message);
-}
+-- فرض تفرّد اسم الدخول عبر كل الفروع
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username);
+`;
 
-// ترقية قواعد بيانات قديمة اتعملت قبل إضافة الأعمدة دي (CREATE TABLE IF NOT EXISTS
-// مابيضفش أعمدة لجدول موجود بالفعل). كل ALTER TABLE هنا محاط بـ try/catch عشان
-// لو العمود موجود بالفعل (سيرفر جديد اتعمل بالسكيما الكاملة من الأول) نتجاهل
-// الخطأ من غير ما نوقف تشغيل السيرفر.
-const MIGRATIONS = [
-  `ALTER TABLE users ADD COLUMN monthly_salary REAL DEFAULT 0;`,
-  `ALTER TABLE advances ADD COLUMN employee_id TEXT;`,
-  `ALTER TABLE advances ADD COLUMN settled INTEGER DEFAULT 0;`,
-  `ALTER TABLE advances ADD COLUMN settled_at INTEGER;`,
-  `ALTER TABLE invoices ADD COLUMN vat_percent REAL DEFAULT 0;`,
-  `ALTER TABLE invoices ADD COLUMN vat_amount REAL DEFAULT 0;`,
-];
-for (const sql of MIGRATIONS) {
-  try { db.exec(sql); } catch (err) { /* العمود موجود بالفعل غالباً، تجاهل */ }
+// ترقية قواعد بيانات قديمة اتعملت قبل إضافة الأعمدة دي. IF NOT EXISTS هنا
+// معناها الأمر بيتنفذ بأمان حتى لو العمود موجود بالفعل، من غير أي خطأ.
+const MIGRATIONS = `
+ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_salary DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE advances ADD COLUMN IF NOT EXISTS employee_id TEXT;
+ALTER TABLE advances ADD COLUMN IF NOT EXISTS settled INTEGER DEFAULT 0;
+ALTER TABLE advances ADD COLUMN IF NOT EXISTS settled_at BIGINT;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS vat_percent DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS vat_amount DOUBLE PRECISION DEFAULT 0;
+`;
+
+async function setupDatabase() {
+  await pool.query(SETUP_SQL);
+  await pool.query(MIGRATIONS);
+  console.log('✅ قاعدة البيانات جاهزة (الجداول اتعملت أو موجودة بالفعل).');
 }
 
 // ============ منطق المزامنة (Sync Engine) ============
@@ -246,66 +268,60 @@ for (const sql of MIGRATIONS) {
 // ده بيحل تعارض التعديلات لو حصل تعديل من فرعين في نفس الوقت (آخر تعديل بيكسب).
 
 // بيضمن إن كل الأعمدة المطلوبة موجودة في الصف قبل ما نحاول نحفظه، حتى لو
-// الصف جاي من نسخة قديمة من الواجهة (قبل إضافة عمود جديد زي employee_id أو
-// monthly_salary) وبالتالي الخاصية دي مش موجودة في الأوبجكت خالص - بنحطها null
-// بدل ما نخلي better-sqlite3 يرمي خطأ "missing named parameter".
+// الصف جاي من نسخة قديمة من الواجهة وبالتالي خاصية معينة مش موجودة في
+// الأوبجكت خالص - بنحطها null بدل ما نخلي الاستعلام يفشل.
 function normalizeRow(row, columns) {
-  const out = {};
-  for (const c of columns) out[c] = row[c] === undefined ? null : row[c];
-  return out;
+  return columns.map(c => (row[c] === undefined ? null : row[c]));
 }
 
-function upsertRows(table, rows, columns) {
+async function upsertRows(client, table, rows, columns) {
   if (!rows || rows.length === 0) return;
-  const placeholders = columns.map(c => `@${c}`).join(', ');
+  const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
   const updateSet = columns.filter(c => c !== 'id').map(c => `${c}=excluded.${c}`).join(', ');
-  const stmt = db.prepare(`
+  const sql = `
     INSERT INTO ${table} (${columns.join(', ')})
     VALUES (${placeholders})
-    ON CONFLICT(id) DO UPDATE SET ${updateSet}
+    ON CONFLICT (id) DO UPDATE SET ${updateSet}
     WHERE excluded.updated_at > ${table}.updated_at
-  `);
-  const insertMany = db.transaction((items) => {
-    for (const item of items) stmt.run(normalizeRow(item, columns));
-  });
-  insertMany(rows);
+  `;
+  for (const item of rows) {
+    await client.query(sql, normalizeRow(item, columns));
+  }
 }
 
 // معالجة خاصة لجدول المستخدمين: لو حصل تعارض في اسم الدخول (مثلاً فرعين
 // أنشأوا يوزر بنفس الاسم أوفلاين)، بنتجاهل السطر ده بس من غير ما نوقف باقي المزامنة.
-function upsertUsers(rows) {
+async function upsertUsers(client, rows) {
   if (!rows || rows.length === 0) return { skipped: [] };
   const columns = TABLE_SCHEMAS.users;
-  const placeholders = columns.map(c => `@${c}`).join(', ');
+  const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
   const updateSet = columns.filter(c => c !== 'id').map(c => `${c}=excluded.${c}`).join(', ');
-  const stmt = db.prepare(`
+  const sql = `
     INSERT INTO users (${columns.join(', ')})
     VALUES (${placeholders})
-    ON CONFLICT(id) DO UPDATE SET ${updateSet}
+    ON CONFLICT (id) DO UPDATE SET ${updateSet}
     WHERE excluded.updated_at > users.updated_at
-  `);
+  `;
   const skipped = [];
-  const insertMany = db.transaction((items) => {
-    for (const item of items) {
-      try {
-        stmt.run(normalizeRow(item, columns));
-      } catch (err) {
-        if (err.message && err.message.includes('UNIQUE constraint failed: users.username')) {
-          console.warn(`⚠️  تم تجاهل تعارض اسم الدخول أثناء المزامنة: user ${item.id} (${item.username})`);
-          skipped.push({ id: item.id, username: item.username });
-          continue; // نكمل باقي السطور بدل ما نفشل المزامنة كلها
-        }
-        throw err; // أي خطأ تاني (مش تعارض اسم الدخول) لازم يفضل يظهر
+  for (const item of rows) {
+    try {
+      await client.query(sql, normalizeRow(item, columns));
+    } catch (err) {
+      if (err.message && err.message.includes('duplicate key value violates unique constraint') && err.message.includes('username')) {
+        console.warn(`⚠️  تم تجاهل تعارض اسم الدخول أثناء المزامنة: user ${item.id} (${item.username})`);
+        skipped.push({ id: item.id, username: item.username });
+        continue; // نكمل باقي السطور بدل ما نفشل المزامنة كلها
       }
+      throw err; // أي خطأ تاني (مش تعارض اسم الدخول) لازم يفضل يظهر
     }
-  });
-  insertMany(rows);
+  }
   return { skipped };
 }
 
 // جلب أي صفوف اتحدثت بعد وقت معين (عشان نبعتها للعميل)
-function getUpdatedSince(table, since) {
-  return db.prepare(`SELECT * FROM ${table} WHERE updated_at > ?`).all(since || 0);
+async function getUpdatedSince(table, since) {
+  const { rows } = await pool.query(`SELECT * FROM ${table} WHERE updated_at > $1`, [since || 0]);
+  return rows;
 }
 
 const TABLE_SCHEMAS = {
@@ -328,6 +344,7 @@ const TABLE_SCHEMAS = {
 // محلياً في الفرونت إند من غير ما يحتاج نت. الـ endpoint ده إضافي: لو الجهاز
 // أونلاين وقت تسجيل الدخول، بيجيب توكن من السيرفر ويستخدمه بعد كده في المزامنة
 // عشان يثبت هويته وصلاحيته للسيرفر (مش بس يعتمد على كلام الجهاز نفسه).
+
 // حماية بسيطة ضد محاولات تخمين كلمة المرور بالتكرار (Brute-force)، مهمة جداً
 // دلوقتي إن السيرفر بقى متاح على الإنترنت لأي حد. بنعدّ المحاولات الفاشلة لكل
 // (IP + اسم مستخدم) خلال آخر 10 دقايق؛ لو عدّت 8 محاولات فاشلة، بنرفض أي
@@ -340,7 +357,6 @@ const LOGIN_MAX_ATTEMPTS = 8;
 function loginRateLimitKey(req, username) {
   return `${req.ip}::${(username || '').toLowerCase()}`;
 }
-
 function isRateLimited(key) {
   const entry = loginAttempts.get(key);
   if (!entry) return false;
@@ -350,7 +366,6 @@ function isRateLimited(key) {
   }
   return entry.count >= LOGIN_MAX_ATTEMPTS;
 }
-
 function recordFailedLogin(key) {
   const entry = loginAttempts.get(key);
   if (!entry || Date.now() - entry.firstAttemptAt > LOGIN_WINDOW_MS) {
@@ -359,12 +374,11 @@ function recordFailedLogin(key) {
     entry.count++;
   }
 }
-
 function clearFailedLogins(key) {
   loginAttempts.delete(key);
 }
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body || {};
     if (!username || !password) {
@@ -374,7 +388,8 @@ app.post('/api/auth/login', (req, res) => {
     if (isRateLimited(rlKey)) {
       return res.status(429).json({ error: 'محاولات كتير غلط، حاول تاني بعد شوية' });
     }
-    const user = db.prepare('SELECT * FROM users WHERE username = ? AND deleted = 0').get(username);
+    const { rows } = await pool.query('SELECT * FROM users WHERE username = $1 AND deleted = 0', [username]);
+    const user = rows[0];
     if (!user) {
       recordFailedLogin(rlKey);
       return res.status(400).json({ error: 'المستخدم غير موجود' });
@@ -413,7 +428,6 @@ function optionalAuth(req, res, next) {
   });
 }
 
-
 // العميل بيبعت: { since: 123456, branches: [...], products: [...], invoices: [...] }
 // السيرفر بيرد: { serverTime: now, branches: [...تحديثات...], products: [...], invoices: [...] }
 //
@@ -422,8 +436,6 @@ function optionalAuth(req, res, next) {
 // admin)، بنمنعه من: (أ) إضافة/تعديل مستخدمين أو فروع أو منتجات، (ب) إرسال أي
 // صف عليه "deleted=1" (يعني عملية حذف) في أي جدول. الصفوف دي بس بتتجاهل
 // (skip) من غير ما توقف باقي المزامنة، بالظبط زي التعامل مع تعارض اسم الدخول.
-// لو الطلب من غير توكن أصلاً (جهاز أقدم أو أوفلاين وقت أول تسجيل دخول) بنكمل
-// عادي زي قبل، عشان منكسرش النظام الحالي.
 const ADMIN_ONLY_TABLES = new Set(['users', 'branches', 'products', 'partners', 'partner_capital']);
 
 function filterRowsForRole(table, rows, user) {
@@ -444,59 +456,90 @@ function filterRowsForRole(table, rows, user) {
 // توكن، عشان أول جهاز يشتغل عليه Karim يقدر "يزرع" الحساب الأول بتاعه على
 // السيرفر أصلاً (وإلا هيبقى مستحيل يجيب توكن من الأول). بمجرد ما أول مستخدم
 // يتسجل على السيرفر، الاستثناء ده بيتقفل تلقائياً للأبد.
-function serverHasAnyUser() {
-  const row = db.prepare('SELECT COUNT(*) as c FROM users WHERE deleted = 0').get();
-  return row.c > 0;
+async function serverHasAnyUser() {
+  const { rows } = await pool.query('SELECT COUNT(*) as c FROM users WHERE deleted = 0');
+  return parseInt(rows[0].c, 10) > 0;
 }
 
-function requireAuthUnlessBootstrapping(req, res, next) {
+async function requireAuthUnlessBootstrapping(req, res, next) {
   if (req.user) return next(); // توكن صالح، اتفضل
-  if (!serverHasAnyUser()) return next(); // قاعدة بيانات فاضية تماماً - أول تشغيل، مسموح
+  try {
+    if (!(await serverHasAnyUser())) return next(); // قاعدة بيانات فاضية تماماً - أول تشغيل، مسموح
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'server_error', message: err.message });
+  }
   return res.status(401).json({ error: 'unauthorized', message: 'لازم تسجّل الدخول الأول عشان تقدر تزامن البيانات' });
 }
 
-app.post('/api/sync', optionalAuth, requireAuthUnlessBootstrapping, (req, res) => {
+app.post('/api/sync', optionalAuth, requireAuthUnlessBootstrapping, async (req, res) => {
+  const client = await pool.connect();
   try {
     const body = req.body || {};
     const since = body.since || 0;
     let skippedUsers = [];
 
+    await client.query('BEGIN');
     for (const table of Object.keys(TABLE_SCHEMAS)) {
       if (!Array.isArray(body[table])) continue;
       const allowedRows = filterRowsForRole(table, body[table], req.user);
       if (table === 'users') {
-        const result = upsertUsers(allowedRows);
+        const result = await upsertUsers(client, allowedRows);
         skippedUsers = result.skipped;
       } else {
-        upsertRows(table, allowedRows, TABLE_SCHEMAS[table]);
+        await upsertRows(client, table, allowedRows, TABLE_SCHEMAS[table]);
       }
     }
+    await client.query('COMMIT');
 
     const response = { serverTime: Date.now() };
     if (skippedUsers.length) response.skippedUsers = skippedUsers;
     for (const table of Object.keys(TABLE_SCHEMAS)) {
-      response[table] = getUpdatedSince(table, since);
+      response[table] = await getUpdatedSince(table, since);
     }
 
     res.json(response);
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ error: 'sync_failed', message: err.message });
+  } finally {
+    client.release();
   }
 });
 
 // نقطة لتحميل كل البيانات من الصفر (أول مرة يفتح فيها فرع جديد)
-app.get('/api/full-state', optionalAuth, requireAuthUnlessBootstrapping, (req, res) => {
-  const response = { serverTime: Date.now() };
-  for (const table of Object.keys(TABLE_SCHEMAS)) {
-    response[table] = db.prepare(`SELECT * FROM ${table} WHERE deleted = 0`).all();
+app.get('/api/full-state', optionalAuth, requireAuthUnlessBootstrapping, async (req, res) => {
+  try {
+    const response = { serverTime: Date.now() };
+    for (const table of Object.keys(TABLE_SCHEMAS)) {
+      const { rows } = await pool.query(`SELECT * FROM ${table} WHERE deleted = 0`);
+      response[table] = rows;
+    }
+    res.json(response);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'full_state_failed', message: err.message });
   }
-  res.json(response);
 });
 
-app.get('/api/health', (req, res) => res.json({ ok: true, time: Date.now() }));
+app.get('/api/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ ok: true, time: Date.now(), db: 'connected' });
+  } catch (err) {
+    res.status(500).json({ ok: false, time: Date.now(), db: 'disconnected', message: err.message });
+  }
+});
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`✅ سيرفر كوداك بيكسل شغال على المنفذ ${PORT}`);
-});
+setupDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`✅ سيرفر كوداك بيكسل شغال على المنفذ ${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('❌ فشل الاتصال بقاعدة البيانات أو إعدادها عند بدء التشغيل:', err);
+    process.exit(1);
+  });
