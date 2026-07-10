@@ -187,6 +187,32 @@ CREATE TABLE IF NOT EXISTS payments (
   updated_at INTEGER NOT NULL,
   deleted INTEGER DEFAULT 0
 );
+
+-- الشركاء: كل شريك مرتبط بفرع معيّن، وله نسبة ثابتة من صافي ربح الفرع ده
+-- (النسبة دي بتتحدد يدويًا باتفاق الشركاء، مش بتتحسب تلقائي من رأس المال).
+CREATE TABLE IF NOT EXISTS partners (
+  id TEXT PRIMARY KEY,
+  branch_id TEXT,
+  name TEXT NOT NULL,
+  share_percent REAL NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  deleted INTEGER DEFAULT 0
+);
+
+-- سجل توثيقي (مش حسابي) لكل مبلغ حطّه أي شريك في أي فرع، عشان يبقى معروف
+-- ومحفوظ بالتاريخ قد إيه كل واحد حط فعليًا. ده منفصل تمامًا عن نسبة الربح
+-- (share_percent فوق)، ومبيغيّرهاش تلقائي.
+CREATE TABLE IF NOT EXISTS partner_capital (
+  id TEXT PRIMARY KEY,
+  partner_id TEXT,
+  branch_id TEXT,
+  amount REAL NOT NULL,
+  note TEXT,
+  created_by TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  deleted INTEGER DEFAULT 0
+);
 `);
 
 // فرض تفرّد اسم الدخول عبر كل الفروع (Fix A).
@@ -293,6 +319,8 @@ const TABLE_SCHEMAS = {
   expenses: ['id', 'branch_id', 'shift_id', 'description', 'amount', 'category', 'created_by', 'created_at', 'updated_at', 'deleted'],
   advances: ['id', 'branch_id', 'shift_id', 'employee_id', 'employee_name', 'amount', 'note', 'created_by', 'created_at', 'updated_at', 'settled', 'settled_at', 'deleted'],
   payments: ['id', 'invoice_id', 'branch_id', 'shift_id', 'amount', 'method', 'note', 'created_by', 'created_at', 'updated_at', 'deleted'],
+  partners: ['id', 'branch_id', 'name', 'share_percent', 'updated_at', 'deleted'],
+  partner_capital: ['id', 'partner_id', 'branch_id', 'amount', 'note', 'created_by', 'created_at', 'updated_at', 'deleted'],
 };
 
 // ============ المصادقة (تسجيل الدخول أونلاين + JWT) ============
@@ -396,7 +424,7 @@ function optionalAuth(req, res, next) {
 // (skip) من غير ما توقف باقي المزامنة، بالظبط زي التعامل مع تعارض اسم الدخول.
 // لو الطلب من غير توكن أصلاً (جهاز أقدم أو أوفلاين وقت أول تسجيل دخول) بنكمل
 // عادي زي قبل، عشان منكسرش النظام الحالي.
-const ADMIN_ONLY_TABLES = new Set(['users', 'branches', 'products']);
+const ADMIN_ONLY_TABLES = new Set(['users', 'branches', 'products', 'partners', 'partner_capital']);
 
 function filterRowsForRole(table, rows, user) {
   if (!user || user.role === 'admin') return rows; // مفيش توكن، أو المستخدم مدير أصلاً

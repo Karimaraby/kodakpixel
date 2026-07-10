@@ -88,8 +88,22 @@
     align-items:center; justify-content:center; z-index:50;
   }
   .modal-bg.active{display:flex;}
-  .modal{background:#fff; border-radius:12px; padding:24px; width:360px;}
+  .modal{background:#fff; border-radius:12px; padding:24px; width:360px; position:relative;}
   .modal h3{margin-top:0;}
+  /* زرار إغلاق (✕) ثابت في كل نافذة منبثقة، عشان المستخدم يقدر يقفلها دايمًا
+     من غير ما يحتاج يسحب لتحت يدور على زرار الإغلاق العادي. */
+  .modal-x{
+    position:absolute; top:14px; inset-inline-end:14px; width:34px; height:34px;
+    border-radius:50%; border:none; background:#f0f1f3; color:#555;
+    font-size:16px; line-height:1; cursor:pointer; z-index:10;
+  }
+  .modal-x:hover{background:#e4e5e8;}
+  /* في النافذة الطويلة (تفاصيل الشفت) اللي بتتسحب لتحت، لازم زرار الإغلاق
+     يفضل ظاهر فوق طول الوقت حتى وانت بتسحب جوه النافذة، مش يختفي مع المحتوى. */
+  .wide-modal .modal-x-sticky{
+    position:sticky; top:0; inset-inline-end:auto; display:block;
+    margin-inline-start:auto; margin-inline-end:-10px;
+  }
   .empty{color:var(--muted); text-align:center; padding:40px 0;}
   .hidden{display:none !important;}
   .login-overlay{
@@ -141,6 +155,7 @@
     <button data-view="users" class="admin-only">الموظفين</button>
     <button data-view="salaries" class="admin-only">الرواتب والسلف</button>
     <button data-view="reports" class="admin-only">تقفيل الشفتات والتقارير</button>
+    <button data-view="partners" class="admin-only">الشركاء</button>
     <button data-view="settings" class="admin-only">الإعدادات</button>
   </nav>
   <div class="shift-bar">
@@ -379,6 +394,20 @@
       <div id="rep-grand-total" style="margin-top:14px; font-weight:700;"></div>
     </div>
 
+    <div class="panel" style="margin-bottom:20px;">
+      <h3 style="margin-top:0;">توزيع الأرباح على الشركاء في الفترة المختارة</h3>
+      <p style="color:var(--muted); font-size:13px; margin-top:-6px;">
+        صافي الربح هنا = إجمالي المبيعات - إجمالي المصروفات (السلف مش بتتحسب هنا لأنها مش مصروف، دي فلوس بترجع من الراتب).
+        نصيب كل شريك = صافي ربح الفرع × نسبته المتفقة.
+      </p>
+      <table>
+        <thead><tr>
+          <th>الفرع</th><th>صافي الربح</th><th>الشريك</th><th>النسبة</th><th>نصيب الشريك</th>
+        </tr></thead>
+        <tbody id="rep-partners-body"></tbody>
+      </table>
+    </div>
+
     <div class="panel">
       <h3 style="margin-top:0;">تفاصيل الشفتات</h3>
       <table>
@@ -387,6 +416,43 @@
           <th>المبيعات</th><th>المصروفات</th><th>السلف</th><th>صافي الكاش المتوقع بالدرج</th><th>الفرق (عجز/زيادة)</th><th></th>
         </tr></thead>
         <tbody id="rep-shifts-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ الشركاء ============ -->
+  <section class="view" id="view-partners">
+    <div class="top-actions">
+      <h2 style="margin:0;">الشركاء</h2>
+      <button class="btn" id="ptn-add-btn">إضافة شريك</button>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px;">
+      <div style="display:flex; gap:14px; align-items:end; flex-wrap:wrap;">
+        <div>
+          <label>الفرع</label>
+          <select id="ptn-branch" style="min-width:220px;"></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:20px;">
+      <h3 style="margin-top:0;">شركاء الفرع ونسبهم</h3>
+      <table>
+        <thead><tr><th>الشريك</th><th>النسبة من الربح</th><th></th></tr></thead>
+        <tbody id="ptn-list-body"></tbody>
+      </table>
+      <div id="ptn-total-note" style="margin-top:14px; font-weight:700;"></div>
+    </div>
+
+    <div class="panel">
+      <div class="top-actions" style="margin-bottom:10px;">
+        <h3 style="margin:0;">سجل رأس المال (توثيقي فقط - مبيغيّرش النسب)</h3>
+        <button class="btn secondary" id="pcm-add-btn">تسجيل مبلغ جديد</button>
+      </div>
+      <table>
+        <thead><tr><th>التاريخ</th><th>الشريك</th><th>المبلغ</th><th>ملاحظة</th><th></th></tr></thead>
+        <tbody id="ptn-capital-body"></tbody>
       </table>
     </div>
   </section>
@@ -416,6 +482,7 @@
 <!-- Modal لإضافة/تعديل منتج -->
 <div class="modal-bg" id="product-modal">
   <div class="modal">
+  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3 id="product-modal-title">منتج جديد</h3>
     <label>اسم المنتج</label><input id="pm-name">
     <label>الكود</label><input id="pm-code">
@@ -432,6 +499,7 @@
 <!-- Modal لإضافة/تعديل فرع -->
 <div class="modal-bg" id="branch-modal">
   <div class="modal">
+  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3 id="branch-modal-title">فرع جديد</h3>
     <label>اسم الفرع</label><input id="bm-name">
     <label>العنوان</label><input id="bm-address">
@@ -460,6 +528,7 @@
 <!-- Modal لإضافة مصروف -->
 <div class="modal-bg" id="expense-modal">
   <div class="modal">
+  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3>مصروف جديد</h3>
     <label>الوصف</label><input id="em-description" placeholder="مثال: فاتورة كهرباء">
     <label>الفئة</label>
@@ -480,6 +549,7 @@
 <!-- Modal لإضافة سلفة -->
 <div class="modal-bg" id="advance-modal">
   <div class="modal">
+  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3>سلفة جديدة</h3>
     <label>الموظف المستلف</label>
     <select id="am-employee-select"></select>
@@ -498,6 +568,7 @@
 <!-- Modal لإضافة/تعديل موظف -->
 <div class="modal-bg" id="user-modal">
   <div class="modal">
+  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3 id="user-modal-title">موظف جديد</h3>
     <label>الاسم</label><input id="um-name">
     <label>اسم الدخول</label><input id="um-username">
@@ -518,9 +589,42 @@
   </div>
 </div>
 
+<!-- Modal إضافة/تعديل شريك -->
+<div class="modal-bg" id="partner-modal">
+  <div class="modal">
+  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
+    <h3 id="partner-modal-title">شريك جديد</h3>
+    <label>الفرع</label><select id="ptm-branch"></select>
+    <label>اسم الشريك</label><input id="ptm-name">
+    <label>نسبته من صافي الربح (%)</label>
+    <input id="ptm-share" type="number" min="0" max="100" step="0.01" placeholder="مثال: 25">
+    <p id="ptm-warning" style="color:var(--red); font-size:13px; display:none;"></p>
+    <div style="display:flex; gap:8px; margin-top:18px;">
+      <button class="btn" id="ptm-save" style="flex:1;">حفظ</button>
+      <button class="btn secondary" id="ptm-cancel" style="flex:1;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal تسجيل مبلغ رأس مال لشريك -->
+<div class="modal-bg" id="partner-capital-modal">
+  <div class="modal">
+  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
+    <h3>تسجيل مبلغ رأس مال</h3>
+    <label>الشريك</label><select id="pcm-partner"></select>
+    <label>المبلغ</label><input id="pcm-amount" type="number" placeholder="مثال: 10000">
+    <label>ملاحظة (اختياري)</label><input id="pcm-note" placeholder="مثال: دفعة أولى">
+    <div style="display:flex; gap:8px; margin-top:18px;">
+      <button class="btn" id="pcm-save" style="flex:1;">حفظ</button>
+      <button class="btn secondary" id="pcm-cancel" style="flex:1;">إلغاء</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal تأكيد إغلاق الشفت (كاش الدرج + الباسورد) -->
 <div class="modal-bg" id="close-shift-modal">
   <div class="modal">
+  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3>إغلاق الشفت</h3>
     <label>الكاش الموجود فعلياً في الدرج</label>
     <input id="cs-actual-cash" type="number" placeholder="مثال: 1500">
@@ -549,6 +653,7 @@
 <!-- Modal عرض تفاصيل الفاتورة -->
 <div class="modal-bg wide-modal" id="shift-details-modal">
   <div class="modal">
+  <button type="button" class="modal-x modal-x-sticky" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3 id="sdm-title">تفاصيل الشفت</h3>
     <div id="sdm-info" style="color:var(--muted); font-size:13px; margin-bottom:6px;"></div>
 
@@ -586,6 +691,7 @@
 
 <div class="modal-bg summary-modal" id="invoice-details-modal">
   <div class="modal" style="width:480px;">
+  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3 id="invoice-details-title">تفاصيل الفاتورة</h3>
     <div id="invoice-details-body"></div>
     <div style="display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;">
@@ -600,6 +706,7 @@
 <!-- Modal إضافة تحصيل من المبلغ المتبقي -->
 <div class="modal-bg" id="add-payment-modal">
   <div class="modal">
+  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3>إضافة المال</h3>
     <div class="summary-row"><span>إجمالي الفاتورة</span><span id="apm-total">0.00 ج.م</span></div>
     <div class="summary-row"><span>المدفوع سابقاً</span><span id="apm-paid-before">0.00 ج.م</span></div>
@@ -624,6 +731,7 @@
 <!-- Modal تعديل الفاتورة (للمدير فقط) -->
 <div class="modal-bg" id="invoice-edit-modal">
   <div class="modal" style="width:400px;">
+  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3>تعديل الفاتورة</h3>
     <label>اسم العميل</label><input id="iem-customer-name">
     <label>رقم الهاتف</label><input id="iem-customer-phone">
@@ -739,12 +847,12 @@ async function hashPassword(plain){
 // طبقة التخزين المحلي (IndexedDB) - بتشتغل حتى من غير إنترنت
 // ============================================================
 const DB_NAME = 'kodakPixelDB';
-const STORES = ['branches','products','invoices','users','shifts','expenses','advances','payments'];
+const STORES = ['branches','products','invoices','users','shifts','expenses','advances','payments','partners','partner_capital'];
 let dbInstance = null;
 
 function openDB(){
   return new Promise((resolve, reject)=>{
-    const req = indexedDB.open(DB_NAME, 2);
+    const req = indexedDB.open(DB_NAME, 3);
     req.onupgradeneeded = (e)=>{
       const db = e.target.result;
       STORES.forEach(s=>{
@@ -825,6 +933,8 @@ async function syncNow(){
       expenses: await idbAllRaw('expenses'),
       advances: await idbAllRaw('advances'),
       payments: await idbAllRaw('payments'),
+      partners: await idbAllRaw('partners'),
+      partner_capital: await idbAllRaw('partner_capital'),
     };
     const res = await fetch(API_URL + '/api/sync', {
       method:'POST',
@@ -836,7 +946,7 @@ async function syncNow(){
       throw new Error('sync failed');
     }
     const data = await res.json();
-    for(const t of ['branches','products','invoices','users','shifts','expenses','advances','payments']){
+    for(const t of ['branches','products','invoices','users','shifts','expenses','advances','payments','partners','partner_capital']){
       if(data[t]?.length) await idbPutMany(t, data[t]);
     }
 
@@ -1673,7 +1783,212 @@ async function runReport(){
   }, {totalSales:0, totalVat:0, totalExpenses:0, totalAdvances:0, netCash:0});
   document.getElementById('rep-grand-total').textContent =
     `الإجمالي العام في الفترة المختارة: إجمالي المبيعات ${grand.totalSales.toFixed(2)} ج.م — منها ضريبة القيمة المضافة ${grand.totalVat.toFixed(2)} ج.م — إجمالي المصروفات ${grand.totalExpenses.toFixed(2)} ج.م — إجمالي السلف ${grand.totalAdvances.toFixed(2)} ج.م — صافي الكاش المتوقع بالدرج ${grand.netCash.toFixed(2)} ج.م`;
+
+  await renderPartnersProfitReport(byBranch);
 }
+
+// ============================================================
+// الشركاء: النسب + سجل رأس المال + توزيع الأرباح في التقارير
+// صفحة إدارة الشركاء دي متاحة للمدير بس (الزرار نفسه أصلاً admin-only).
+// ============================================================
+
+// بيوري في صفحة التقارير - لكل فرع ظهر في الفترة المختارة - صافي ربحه
+// (مبيعات - مصروفات) ونصيب كل شريك فيه حسب نسبته المتفقة.
+async function renderPartnersProfitReport(byBranch){
+  const allPartners = await idbAll('partners');
+  const rows = [];
+  for(const b of Object.values(byBranch)){
+    const netProfit = centsToNumber(toCents(b.totalSales) - toCents(b.totalExpenses));
+    const branchPartners = allPartners.filter(p=>p.branch_id===b.branch_id);
+    if(branchPartners.length===0){
+      rows.push(`<tr>
+        <td>${branchName(b.branch_id)}</td>
+        <td>${netProfit.toFixed(2)} ج.م</td>
+        <td colspan="3" style="color:var(--muted);">مفيش شركاء مسجلين للفرع ده</td>
+      </tr>`);
+      continue;
+    }
+    for(const p of branchPartners){
+      const share = centsToNumber(toCents(netProfit) * p.share_percent / 100);
+      rows.push(`<tr>
+        <td>${branchName(b.branch_id)}</td>
+        <td>${netProfit.toFixed(2)} ج.م</td>
+        <td>${p.name}</td>
+        <td>${p.share_percent}%</td>
+        <td style="font-weight:700;">${share.toFixed(2)} ج.م</td>
+      </tr>`);
+    }
+  }
+  document.getElementById('rep-partners-body').innerHTML = rows.join('') ||
+    `<tr><td colspan="5" style="text-align:center; color:var(--muted);">لا توجد بيانات في الفترة المختارة</td></tr>`;
+}
+
+function refreshPartnerBranchSelect(){
+  const selects = [document.getElementById('ptn-branch'), document.getElementById('ptm-branch')];
+  selects.forEach(sel=>{
+    const current = sel.value;
+    sel.innerHTML = allBranches.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+    sel.value = current || (allBranches[0] ? allBranches[0].id : '');
+  });
+}
+
+// إجمالي النسب المستخدمة فعلاً في الفرع، ما عدا شريك معيّن لو بنعدّل فيه
+// (عشان لما نحسب "هل ده هيخلي الإجمالي يزيد عن 100%" ماناخدش نسبته القديمة مرتين).
+async function branchPartnersTotalPercent(branchId, excludePartnerId){
+  const partners = (await idbAll('partners')).filter(p=>p.branch_id===branchId && p.id!==excludePartnerId);
+  return partners.reduce((sum,p)=>sum + Number(p.share_percent||0), 0);
+}
+
+async function renderPartners(){
+  const branchId = document.getElementById('ptn-branch').value;
+  const partners = (await idbAll('partners')).filter(p=>p.branch_id===branchId);
+  document.getElementById('ptn-list-body').innerHTML = partners.map(p=>`
+    <tr>
+      <td>${p.name}</td>
+      <td>${p.share_percent}%</td>
+      <td>
+        <button class="btn small secondary" onclick="openPartnerModal('${p.id}')">تعديل</button>
+        <button class="btn small danger" onclick="deletePartner('${p.id}')">حذف</button>
+      </td>
+    </tr>`).join('') || `<tr><td colspan="3" style="text-align:center; color:var(--muted);">لا يوجد شركاء لهذا الفرع بعد</td></tr>`;
+
+  const total = partners.reduce((sum,p)=>sum + Number(p.share_percent||0), 0);
+  const noteEl = document.getElementById('ptn-total-note');
+  if(partners.length===0){
+    noteEl.textContent = '';
+  } else if(Math.abs(total-100) < 0.01){
+    noteEl.style.color = 'var(--green)';
+    noteEl.textContent = `إجمالي النسب: ${total.toFixed(2)}% ✓ (موزّعة بالكامل)`;
+  } else {
+    noteEl.style.color = 'var(--amber)';
+    noteEl.textContent = `إجمالي النسب: ${total.toFixed(2)}% — لسه فيه ${(100-total).toFixed(2)}% مش موزّعة على شركاء`;
+  }
+}
+
+let editingPartnerId = null;
+window.openPartnerModal = async (id)=>{
+  editingPartnerId = id || null;
+  document.getElementById('ptm-warning').style.display = 'none';
+  refreshPartnerBranchSelect();
+  if(id){
+    const p = (await idbAll('partners')).find(x=>x.id===id);
+    document.getElementById('partner-modal-title').textContent = 'تعديل شريك';
+    document.getElementById('ptm-branch').value = p.branch_id;
+    document.getElementById('ptm-name').value = p.name;
+    document.getElementById('ptm-share').value = p.share_percent;
+  } else {
+    document.getElementById('partner-modal-title').textContent = 'شريك جديد';
+    document.getElementById('ptm-branch').value = document.getElementById('ptn-branch').value;
+    document.getElementById('ptm-name').value = '';
+    document.getElementById('ptm-share').value = '';
+  }
+  document.getElementById('partner-modal').classList.add('active');
+};
+document.getElementById('ptn-add-btn').onclick = ()=>openPartnerModal(null);
+document.getElementById('ptm-cancel').onclick = ()=>document.getElementById('partner-modal').classList.remove('active');
+
+document.getElementById('ptm-save').onclick = async ()=>{
+  const branchId = document.getElementById('ptm-branch').value;
+  const name = document.getElementById('ptm-name').value.trim();
+  const share = parseFloat(document.getElementById('ptm-share').value);
+  const warnEl = document.getElementById('ptm-warning');
+  warnEl.style.display = 'none';
+  if(!branchId) return alert('اختار الفرع الأول');
+  if(!name) return alert('اكتب اسم الشريك');
+  if(isNaN(share) || share < 0 || share > 100) return alert('اكتب نسبة صحيحة بين 0 و100');
+
+  // منع إن مجموع نسب الفرع يتعدّى 100% (تنبيه واضح بدل ما نخلي شريك ياخد
+  // نصيب أكبر من غير قصد على حساب باقي الشركاء).
+  const otherTotal = await branchPartnersTotalPercent(branchId, editingPartnerId);
+  if(otherTotal + share > 100.01){
+    warnEl.textContent = `مينفعش — باقي الشركاء في الفرع ده أخدوا ${otherTotal.toFixed(2)}% خلاص، يعني أقصى نسبة ممكنة للشريك ده هي ${(100-otherTotal).toFixed(2)}%.`;
+    warnEl.style.display = 'block';
+    return;
+  }
+
+  const record = editingPartnerId
+    ? Object.assign({}, (await idbAll('partners')).find(p=>p.id===editingPartnerId), {branch_id:branchId, name, share_percent:share, updated_at:now()})
+    : {id: uid(), branch_id:branchId, name, share_percent:share, updated_at:now(), deleted:0};
+  await idbPut('partners', record);
+  document.getElementById('partner-modal').classList.remove('active');
+  await renderPartners();
+  syncNow();
+};
+
+window.deletePartner = async (id)=>{
+  if(!confirm('متأكد إنك عايز تحذف الشريك ده؟')) return;
+  const p = (await idbAll('partners')).find(x=>x.id===id);
+  if(!p) return;
+  p.deleted = 1; p.updated_at = now();
+  await idbPut('partners', p);
+  await renderPartners();
+  syncNow();
+};
+
+// -------- سجل رأس المال --------
+async function refreshPartnerCapitalPartnerSelect(){
+  const branchId = document.getElementById('ptn-branch').value;
+  const partners = (await idbAll('partners')).filter(p=>p.branch_id===branchId);
+  const sel = document.getElementById('pcm-partner');
+  sel.innerHTML = partners.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+}
+
+async function renderPartnerCapital(){
+  const branchId = document.getElementById('ptn-branch').value;
+  const entries = (await idbAll('partner_capital')).filter(c=>c.branch_id===branchId).sort((a,b)=>b.created_at-a.created_at);
+  const partners = await idbAll('partners');
+  const partnerName = (id)=> partners.find(p=>p.id===id)?.name || '(شريك محذوف)';
+  document.getElementById('ptn-capital-body').innerHTML = entries.map(c=>`
+    <tr>
+      <td>${new Date(c.created_at).toLocaleDateString('ar-EG')}</td>
+      <td>${partnerName(c.partner_id)}</td>
+      <td>${Number(c.amount).toFixed(2)} ج.م</td>
+      <td>${c.note||'-'}</td>
+      <td><button class="btn small danger" onclick="deletePartnerCapital('${c.id}')">حذف</button></td>
+    </tr>`).join('') || `<tr><td colspan="5" style="text-align:center; color:var(--muted);">لا توجد مبالغ مسجلة لهذا الفرع بعد</td></tr>`;
+}
+
+document.getElementById('pcm-add-btn').onclick = async ()=>{
+  const branchId = document.getElementById('ptn-branch').value;
+  const partners = (await idbAll('partners')).filter(p=>p.branch_id===branchId);
+  if(partners.length===0) return alert('ضيف شريك للفرع ده الأول قبل ما تسجل مبلغ');
+  await refreshPartnerCapitalPartnerSelect();
+  document.getElementById('pcm-amount').value = '';
+  document.getElementById('pcm-note').value = '';
+  document.getElementById('partner-capital-modal').classList.add('active');
+};
+document.getElementById('pcm-cancel').onclick = ()=>document.getElementById('partner-capital-modal').classList.remove('active');
+
+document.getElementById('pcm-save').onclick = async ()=>{
+  const partnerId = document.getElementById('pcm-partner').value;
+  const amount = parseFloat(document.getElementById('pcm-amount').value);
+  const note = document.getElementById('pcm-note').value.trim();
+  if(!partnerId) return alert('اختار الشريك');
+  if(isNaN(amount) || amount <= 0) return alert('اكتب مبلغ صحيح أكبر من صفر');
+  const branchId = document.getElementById('ptn-branch').value;
+  await idbPut('partner_capital', {
+    id: uid(), partner_id: partnerId, branch_id: branchId, amount, note,
+    created_by: currentUser?.id || null, created_at: now(), updated_at: now(), deleted: 0
+  });
+  document.getElementById('partner-capital-modal').classList.remove('active');
+  await renderPartnerCapital();
+  syncNow();
+};
+
+window.deletePartnerCapital = async (id)=>{
+  if(!confirm('متأكد إنك عايز تحذف السجل ده؟')) return;
+  const c = (await idbAll('partner_capital')).find(x=>x.id===id);
+  if(!c) return;
+  c.deleted = 1; c.updated_at = now();
+  await idbPut('partner_capital', c);
+  await renderPartnerCapital();
+  syncNow();
+};
+
+document.getElementById('ptn-branch').addEventListener('change', async ()=>{
+  await renderPartners();
+  await renderPartnerCapital();
+});
 
 // ============================================================
 // تفاصيل الشفت الكاملة (من صفحة التقفيل والتقارير) + قفل شفتات
@@ -2406,6 +2721,9 @@ async function refreshAll(){
     await refreshUsers();
     await refreshSalaries();
     refreshReportBranchSelect();
+    refreshPartnerBranchSelect();
+    await renderPartners();
+    await renderPartnerCapital();
     if(!document.getElementById('rep-start').value){
       reportQuickRange('today');
     }
