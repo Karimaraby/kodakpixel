@@ -379,6 +379,7 @@
         <button class="btn secondary" id="rep-yesterday-btn">أمس</button>
         <button class="btn secondary" id="rep-month-btn">الشهر ده</button>
         <button class="btn" id="rep-run-btn">عرض التقرير</button>
+        <button class="btn secondary" id="rep-export-btn">تصدير Excel (CSV)</button>
       </div>
     </div>
 
@@ -656,6 +657,10 @@
   <button type="button" class="modal-x modal-x-sticky" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3 id="sdm-title">تفاصيل الشفت</h3>
     <div id="sdm-info" style="color:var(--muted); font-size:13px; margin-bottom:6px;"></div>
+    <div id="sdm-admin-tools" style="display:none; gap:8px; margin-bottom:14px;">
+      <button class="btn small secondary" id="sdm-edit-actual-cash-btn">تصحيح الكاش الفعلي</button>
+      <button class="btn small danger" id="sdm-delete-shift-btn">حذف الشفت بالكامل</button>
+    </div>
 
     <div class="admin-close-box" id="sdm-close-shift-box" style="display:none;">
       <div style="font-weight:700;">إغلاق شفت الموظف (كمدير)</div>
@@ -673,13 +678,19 @@
       <tbody id="sdm-invoices-body"></tbody>
     </table>
 
-    <h4>المصروفات في الشفت ده</h4>
+    <h4 style="display:flex; align-items:center; justify-content:space-between;">
+      <span>المصروفات في الشفت ده</span>
+      <button class="btn small" id="sdm-add-expense-btn" style="display:none;">+ إضافة مصروف للشفت ده</button>
+    </h4>
     <table>
       <thead><tr><th>الوصف</th><th>الفئة</th><th>المبلغ</th><th></th></tr></thead>
       <tbody id="sdm-expenses-body"></tbody>
     </table>
 
-    <h4>السلف في الشفت ده</h4>
+    <h4 style="display:flex; align-items:center; justify-content:space-between;">
+      <span>السلف في الشفت ده</span>
+      <button class="btn small" id="sdm-add-advance-btn" style="display:none;">+ إضافة سلفة للشفت ده</button>
+    </h4>
     <table>
       <thead><tr><th>الموظف</th><th>المبلغ</th><th>ملاحظات</th><th></th></tr></thead>
       <tbody id="sdm-advances-body"></tbody>
@@ -835,6 +846,27 @@ async function computeShiftFinancials(shiftId){
     invoicesCount: invoices.length, totalSales, totalVat, totalPaid: totalCollected, byMethod,
     collectedOnOtherShiftsInvoices, totalExpenses, totalAdvances, netCash
   };
+}
+
+// بيرجع أرقام الشفت "الحية" دايمًا (محسوبة من البيانات الفعلية دلوقتي)، حتى لو
+// الشفت مقفول. الاستثناء الوحيد: "الكاش الفعلي" اللي المدير أو الكاشير كتبه
+// بإيده وقت القفل (ده رقم فعلي اتعدّ بالإيد في لحظة معينة، لازم يفضل زي ما هو
+// ومبيتغيرش). أما كل باقي الأرقام (المبيعات، المصروفات، السلف، صافي الكاش
+// المتوقع...) فلازم تتحسب من جديد في كل مرة، عشان لو اتحذفت فاتورة أو مصروف
+// بعد قفل الشفت، التقارير تعكس ده فورًا بدل ما تفضل عارضة أرقام قديمة.
+async function getShiftDisplayFinancials(shift){
+  const fin = await computeShiftFinancials(shift.id);
+  let actualCash = null, variance = null;
+  if(shift.status==='closed' && shift.summary_json){
+    try{
+      const frozen = JSON.parse(shift.summary_json);
+      if(frozen.actualCash !== undefined && frozen.actualCash !== null){
+        actualCash = frozen.actualCash;
+        variance = centsToNumber(toCents(actualCash) - toCents(fin.netCash));
+      }
+    }catch(e){ /* ملخص قديم أو تالف، نتجاهله ونكمل بالأرقام الحية بس */ }
+  }
+  return { ...fin, actualCash, variance };
 }
 
 async function hashPassword(plain){
@@ -1702,17 +1734,13 @@ async function runReport(){
   let shifts = (await idbAll('shifts')).filter(s=>s.opened_at>=startTs && s.opened_at<=endTs);
   if(branchFilter) shifts = shifts.filter(s=>s.branch_id===branchFilter);
 
-  // لكل شفت: لو مقفول بنستخدم الملخص المحفوظ وقت القفل (فيه الكاش الفعلي والفرق الحقيقي)،
-  // ولو لسه مفتوح بنحسب أرقامه لحظياً (من غير كاش فعلي/فرق لإنه لسه ما اتقفلش).
+  // لكل شفت بنحسب الأرقام لحظياً من البيانات الفعلية دلوقتي (مش من ملخص قديم
+  // محفوظ وقت القفل)، عشان لو اتحذفت فاتورة أو مصروف بعد كده، الرقم هنا يتغيّر
+  // فورًا ويعكس الواقع. "الكاش الفعلي" و"الفرق" بس بيفضلوا زي ما اتكتبوا وقت
+  // القفل (دول رقم حقيقي اتعدّ بالإيد، مش حساب).
   const rows = [];
   for(const s of shifts){
-    let fin;
-    if(s.status==='closed' && s.summary_json){
-      fin = JSON.parse(s.summary_json);
-    } else {
-      fin = await computeShiftFinancials(s.id);
-      fin.actualCash = null; fin.variance = null;
-    }
+    const fin = await getShiftDisplayFinancials(s);
     rows.push({shift: s, fin});
   }
 
@@ -1785,7 +1813,46 @@ async function runReport(){
     `الإجمالي العام في الفترة المختارة: إجمالي المبيعات ${grand.totalSales.toFixed(2)} ج.م — منها ضريبة القيمة المضافة ${grand.totalVat.toFixed(2)} ج.م — إجمالي المصروفات ${grand.totalExpenses.toFixed(2)} ج.م — إجمالي السلف ${grand.totalAdvances.toFixed(2)} ج.م — صافي الكاش المتوقع بالدرج ${grand.netCash.toFixed(2)} ج.م`;
 
   await renderPartnersProfitReport(byBranch);
+  lastReportRows = rows; // نخزنها عشان زرار "تصدير Excel" يقدر يستخدم نفس الأرقام المعروضة بالظبط
 }
+
+let lastReportRows = [];
+
+// بيحوّل تفاصيل الشفتات المعروضة في التقرير لملف CSV (بيتفتح في Excel عادي).
+// بنبني الملف من نفس "rows" اللي التقرير المعروض على الشاشة اتبنى منها، عشان
+// أي رقم في الملف يطابق بالظبط اللي شايفه على الشاشة، مفيش حساب مختلف.
+function csvEscape(val){
+  const s = String(val ?? '');
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+window.exportReportToCSV = ()=>{
+  if(!lastReportRows.length){ alert('اعرض التقرير الأول (زرار "عرض التقرير") قبل التصدير'); return; }
+  const headers = ['وقت الفتح','وقت الإغلاق','الفرع','الكاشير','الحالة','المبيعات','ضريبة القيمة المضافة','المصروفات','السلف','صافي الكاش المتوقع','الفرق (عجز/زيادة)'];
+  const lines = [headers.map(csvEscape).join(',')];
+  for(const {shift, fin} of lastReportRows.sort((a,b)=>b.shift.opened_at-a.shift.opened_at)){
+    const statusLabel = shift.status==='closed' ? 'مقفول' : 'مفتوح دلوقتي';
+    const closedLabel = shift.closed_at ? new Date(shift.closed_at).toLocaleString('ar-EG') : '-';
+    const varianceCell = (fin.variance===null || fin.variance===undefined) ? '' : fin.variance.toFixed(2);
+    lines.push([
+      new Date(shift.opened_at).toLocaleString('ar-EG'), closedLabel, branchName(shift.branch_id),
+      shift.user_name||'-', statusLabel, (fin.totalSales||0).toFixed(2), (fin.totalVat||0).toFixed(2),
+      (fin.totalExpenses||0).toFixed(2), (fin.totalAdvances||0).toFixed(2), (fin.netCash||0).toFixed(2), varianceCell
+    ].map(csvEscape).join(','));
+  }
+  // BOM (\uFEFF) في الأول عشان Excel يعرض الحروف العربية صح من غير ما تتحول لرموز غريبة
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const startStr = document.getElementById('rep-start').value;
+  const endStr = document.getElementById('rep-end').value;
+  a.href = url;
+  a.download = `تقرير-كوداك-بيكسل-${startStr}-الى-${endStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+document.getElementById('rep-export-btn').onclick = exportReportToCSV;
 
 // ============================================================
 // الشركاء: النسب + سجل رأس المال + توزيع الأرباح في التقارير
@@ -2020,12 +2087,34 @@ window.openShiftDetails = async (shiftId)=>{
     closeBox.style.display = 'none';
   }
 
-  let fin;
-  if(shift.status==='closed' && shift.summary_json){
-    fin = JSON.parse(shift.summary_json);
+  // أدوات المدير: تصحيح الكاش الفعلي (لو الشفت مقفول بالفعل) وحذف الشفت بالكامل.
+  const adminTools = document.getElementById('sdm-admin-tools');
+  if(currentUser.role==='admin'){
+    adminTools.style.display = 'flex';
+    const editCashBtn = document.getElementById('sdm-edit-actual-cash-btn');
+    editCashBtn.style.display = shift.status==='closed' ? 'inline-block' : 'none';
+    editCashBtn.onclick = ()=> editShiftActualCash(shiftId);
+    document.getElementById('sdm-delete-shift-btn').onclick = ()=> deleteShiftFromShiftDetails(shiftId);
   } else {
-    fin = await computeShiftFinancials(shiftId);
+    adminTools.style.display = 'none';
   }
+
+  // زراير إضافة مصروف/سلفة لنفس الشفت ده بالذات (حتى لو مقفول بالفعل)، للمدير
+  // بس - عشان لو نسي حد يسجّل مصروف أو سلفة وقت الشفت، المدير يقدر يضيفه
+  // بعدين ويتحسب صح في نفس الشفت التاريخي ده، مش في الشفت المفتوح دلوقتي.
+  const addExpenseBtn = document.getElementById('sdm-add-expense-btn');
+  const addAdvanceBtn = document.getElementById('sdm-add-advance-btn');
+  if(currentUser.role==='admin'){
+    addExpenseBtn.style.display = 'inline-block';
+    addAdvanceBtn.style.display = 'inline-block';
+    addExpenseBtn.onclick = ()=> addExpenseToShift(shiftId);
+    addAdvanceBtn.onclick = ()=> addAdvanceToShift(shiftId);
+  } else {
+    addExpenseBtn.style.display = 'none';
+    addAdvanceBtn.style.display = 'none';
+  }
+
+  const fin = await getShiftDisplayFinancials(shift);
   renderShiftDetailsSummary(fin);
 
   const invoices = (await idbAll('invoices')).filter(i=>i.shift_id===shiftId && !i.deleted).sort((a,b)=>b.created_at-a.created_at);
@@ -2053,14 +2142,14 @@ window.openShiftDetails = async (shiftId)=>{
   document.getElementById('sdm-expenses-body').innerHTML = expenses.map(e=>`
     <tr>
       <td>${e.description}</td><td>${e.category||'-'}</td><td>${e.amount.toFixed(2)} ج.م</td>
-      <td>${currentUser.role==='admin' ? `<button class="btn small danger" onclick="deleteExpenseFromShiftDetails('${e.id}')">حذف</button>` : ''}</td>
+      <td>${currentUser.role==='admin' ? `<button class="btn small secondary" onclick="editExpenseFromShiftDetails('${e.id}')">تعديل</button> <button class="btn small danger" onclick="deleteExpenseFromShiftDetails('${e.id}')">حذف</button>` : ''}</td>
     </tr>`).join('') || `<tr><td colspan="4" style="text-align:center; color:var(--muted);">لا توجد مصروفات في الشفت ده</td></tr>`;
 
   const advances = (await idbAll('advances')).filter(a=>a.shift_id===shiftId && !a.deleted);
   document.getElementById('sdm-advances-body').innerHTML = advances.map(a=>`
     <tr>
       <td>${a.employee_name}</td><td>${a.amount.toFixed(2)} ج.م</td><td>${a.note||'-'}</td>
-      <td>${currentUser.role==='admin' ? `<button class="btn small danger" onclick="deleteAdvanceFromShiftDetails('${a.id}')">حذف</button>` : ''}</td>
+      <td>${currentUser.role==='admin' ? `<button class="btn small secondary" onclick="editAdvanceFromShiftDetails('${a.id}')">تعديل</button> <button class="btn small danger" onclick="deleteAdvanceFromShiftDetails('${a.id}')">حذف</button>` : ''}</td>
     </tr>`).join('') || `<tr><td colspan="4" style="text-align:center; color:var(--muted);">لا توجد سلف في الشفت ده</td></tr>`;
 
   document.getElementById('shift-details-modal').classList.add('active');
@@ -2135,6 +2224,129 @@ window.deleteExpenseFromShiftDetails = async (id)=>{
 window.deleteAdvanceFromShiftDetails = async (id)=>{
   await deleteAdvance(id);
   if(sdmCurrentShiftId) await openShiftDetails(sdmCurrentShiftId);
+};
+
+// إضافة مصروف لشفت معيّن بالذات (المدير بس) - بيتحسب على نفس الشفت ده حتى لو
+// مقفول بالفعل أو مختلف عن الشفت المفتوح دلوقتي، عشان تصحيح تاريخي صحيح.
+window.addExpenseToShift = async (shiftId)=>{
+  if(currentUser.role!=='admin') return;
+  const shift = (await idbAll('shifts')).find(s=>s.id===shiftId);
+  if(!shift) return;
+  const description = prompt('وصف المصروف:');
+  if(description===null) return;
+  const amountStr = prompt('المبلغ:');
+  if(amountStr===null) return;
+  const amount = parseFloat(amountStr);
+  if(!description.trim() || isNaN(amount) || amount<=0){ alert('اكتب وصف ومبلغ صحيح أكبر من صفر'); return; }
+  await idbPut('expenses', {
+    id: uid(), branch_id: shift.branch_id, shift_id: shiftId, description: description.trim(),
+    amount, category: 'تصحيح إداري', created_by: currentUser.name, created_at: now(), updated_at: now(), deleted: 0
+  });
+  await openShiftDetails(shiftId);
+  if(navigator.onLine) syncNow();
+};
+
+// إضافة سلفة لشفت معيّن بالذات (المدير بس) - تصحيح إداري، من غير باسورد
+// الموظف (زي تعديل السلف، مش عملية صرف جديدة فعلية).
+window.addAdvanceToShift = async (shiftId)=>{
+  if(currentUser.role!=='admin') return;
+  const shift = (await idbAll('shifts')).find(s=>s.id===shiftId);
+  if(!shift) return;
+  const users = (await idbAll('users')).filter(u=>!u.deleted);
+  const namesList = users.map(u=>u.name).join('، ');
+  const typedName = prompt(`اسم الموظف بالظبط من القايمة دي:\n${namesList}`);
+  if(typedName===null) return;
+  const employee = users.find(u=>u.name.trim()===typedName.trim());
+  if(!employee){ alert('الاسم ده مش موجود في قايمة الموظفين، اكتبه زي ما هو بالظبط'); return; }
+  const amountStr = prompt('مبلغ السلفة:');
+  if(amountStr===null) return;
+  const amount = parseFloat(amountStr);
+  if(isNaN(amount) || amount<=0){ alert('اكتب مبلغ صحيح أكبر من صفر'); return; }
+  const note = prompt('ملاحظة (اختياري):', '') || '';
+  await idbPut('advances', {
+    id: uid(), branch_id: shift.branch_id, shift_id: shiftId, employee_id: employee.id, employee_name: employee.name,
+    amount, note: note.trim(), created_by: currentUser.name, created_at: now(), updated_at: now(), settled: 0, deleted: 0
+  });
+  await openShiftDetails(shiftId);
+  await refreshSalaries();
+  if(navigator.onLine) syncNow();
+};
+
+// تعديل مصروف موجود (المدير بس) - وصف ومبلغ، مباشرة من شاشة تفاصيل الشفت.
+window.editExpenseFromShiftDetails = async (id)=>{
+  if(currentUser.role!=='admin') return;
+  const e = (await idbAll('expenses')).find(x=>x.id===id);
+  if(!e) return;
+  const newDesc = prompt('الوصف:', e.description);
+  if(newDesc===null) return; // دوس إلغاء
+  const newAmountStr = prompt('المبلغ:', e.amount);
+  if(newAmountStr===null) return;
+  const newAmount = parseFloat(newAmountStr);
+  if(!newDesc.trim() || isNaN(newAmount) || newAmount<=0){ alert('الوصف والمبلغ لازم يكونوا صحيحين (المبلغ أكبر من صفر)'); return; }
+  e.description = newDesc.trim();
+  e.amount = newAmount;
+  e.updated_at = now();
+  await idbPut('expenses', e);
+  if(sdmCurrentShiftId) await openShiftDetails(sdmCurrentShiftId);
+  if(navigator.onLine) syncNow();
+};
+
+// تعديل سلفة موجودة (المدير بس) - مبلغ وملاحظة. من غير ما نطلب باسورد الموظف
+// تاني، لإن ده تصحيح إداري من المدير مش عملية صرف سلفة جديدة.
+window.editAdvanceFromShiftDetails = async (id)=>{
+  if(currentUser.role!=='admin') return;
+  const a = (await idbAll('advances')).find(x=>x.id===id);
+  if(!a) return;
+  const newAmountStr = prompt('مبلغ السلفة:', a.amount);
+  if(newAmountStr===null) return;
+  const newAmount = parseFloat(newAmountStr);
+  if(isNaN(newAmount) || newAmount<=0){ alert('اكتب مبلغ صحيح أكبر من صفر'); return; }
+  const newNote = prompt('ملاحظة (اختياري):', a.note||'');
+  if(newNote===null) return;
+  a.amount = newAmount;
+  a.note = newNote.trim();
+  a.updated_at = now();
+  await idbPut('advances', a);
+  if(sdmCurrentShiftId) await openShiftDetails(sdmCurrentShiftId);
+  if(navigator.onLine) syncNow();
+};
+
+// تصحيح "الكاش الفعلي" اللي اتكتب وقت قفل شفت مقفول بالفعل (لو حصل غلط
+// كتابة وقتها). الفرق (عجز/زيادة) بيتحسب لحظياً بعد كده تلقائي من غير ما
+// نحتاج نلمسه إحنا، لإن getShiftDisplayFinancials بيحسبه بنفسه كل مرة.
+window.editShiftActualCash = async (shiftId)=>{
+  if(currentUser.role!=='admin') return;
+  const shift = (await idbAll('shifts')).find(s=>s.id===shiftId);
+  if(!shift || shift.status!=='closed') return;
+  let frozen = {};
+  try{ frozen = JSON.parse(shift.summary_json||'{}'); }catch(e){}
+  const newCashStr = prompt('الكاش الفعلي الصحيح اللي كان في الدرج وقت القفل:', frozen.actualCash ?? 0);
+  if(newCashStr===null) return;
+  const newCash = parseFloat(newCashStr);
+  if(isNaN(newCash) || newCash<0){ alert('اكتب رقم صحيح'); return; }
+  frozen.actualCash = newCash;
+  shift.summary_json = JSON.stringify(frozen);
+  shift.updated_at = now();
+  await idbPut('shifts', shift);
+  if(sdmCurrentShiftId) await openShiftDetails(sdmCurrentShiftId);
+  if(navigator.onLine) syncNow();
+};
+
+// حذف شفت بالكامل (المدير بس) - نادراً ما يُستخدم، لشفت اتعمل بالغلط مثلاً.
+// الفواتير والمصروفات والسلف المرتبطة بيه بتفضل موجودة في سجلاتها (مش بتتمسح)
+// لكن الشفت نفسه بيختفي من قايمة الشفتات والتقارير.
+window.deleteShiftFromShiftDetails = async (shiftId)=>{
+  if(currentUser.role!=='admin') return;
+  if(!confirm('متأكد إنك عايز تحذف الشفت ده بالكامل؟ الإجراء ده مش هينفع يتراجع فيه.')) return;
+  if(!confirm('تأكيد أخير: حذف الشفت هيشيله من التقارير نهائياً. متأكد؟')) return;
+  const shift = (await idbAll('shifts')).find(s=>s.id===shiftId);
+  if(!shift) return;
+  shift.deleted = 1;
+  shift.updated_at = now();
+  await idbPut('shifts', shift);
+  document.getElementById('shift-details-modal').classList.remove('active');
+  if(document.getElementById('view-reports').classList.contains('active')) await runReport();
+  if(navigator.onLine) syncNow();
 };
 
 // فاتورة جديدة (الكاشير)
