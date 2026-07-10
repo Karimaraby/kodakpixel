@@ -50,6 +50,29 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
+// ============================================================
+// 🔍 تشخيص مؤقت - هنشيله بعد ما نحل مشكلة الاتصال
+// بيطبع معلومات عن شكل القيمة المحفوظة من غير ما يكشف الباسورد نفسها،
+// عشان نتأكد مفيش مسافات أو علامات اقتباس أو أسطر جديدة مخفية اتلصقت
+// بالغلط جوه القيمة المحفوظة في Render.
+// ============================================================
+{
+  const raw = process.env.DATABASE_URL;
+  console.log('🔍 [تشخيص] طول القيمة المحفوظة (عدد الحروف):', raw.length);
+  console.log('🔍 [تشخيص] أول 25 حرف:', JSON.stringify(raw.slice(0, 25)));
+  console.log('🔍 [تشخيص] آخر 15 حرف:', JSON.stringify(raw.slice(-15)));
+  console.log('🔍 [تشخيص] فيه مسافة في الأول أو الآخر؟', raw !== raw.trim());
+  console.log('🔍 [تشخيص] فيه علامات اقتباس " أو \' جوه القيمة؟', raw.includes('"') || raw.includes("'"));
+  try {
+    const u = new URL(raw);
+    console.log('🔍 [تشخيص] اسم الدخول (username) اللي اتقرا:', JSON.stringify(u.username));
+    console.log('🔍 [تشخيص] طول الباسورد اللي اتقرا:', decodeURIComponent(u.password || '').length);
+    console.log('🔍 [تشخيص] الهوست:', u.hostname, '| البورت:', u.port);
+  } catch (e) {
+    console.log('🔍 [تشخيص] ⚠️ الرابط نفسه شكله غلط وماقدرش يتقرا كـ URL أصلاً:', e.message);
+  }
+}
+
 // Supabase بيتطلب اتصال مشفّر (SSL). rejectUnauthorized:false هنا معناها بنقبل
 // شهادة Supabase من غير ما نحتاج نضيف شهادات إضافية يدوياً - ده الإعداد
 // القياسي المتبع مع خدمات الاستضافة المُدارة زي Supabase وRender وHeroku.
