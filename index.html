@@ -1310,7 +1310,12 @@ async function attemptLogin(){
     document.getElementById('login-error').style.display = 'none';
     currentUser = user;
     localStorage.setItem('kp_current_user_id', user.id);
-    await tryFetchAuthToken(username, password); // بست-إفورت: ماينفعش يوقف الدخول لو فشل
+    // مهم: مبنستناش رد السيرفر هنا قبل ما نفتح الشاشة - لو Render نايم أو النت
+    // بطيء، الطلب ده ممكن ياخد لحد دقيقة، وكان ده اللي بيخلي شاشة الدخول تفضل
+    // "متجمدة" وتحتاج Refresh يدوي. النظام أوفلاين-فيرست أصلاً، فبنفتح الشاشة
+    // فوراً من غير انتظار، وبنجيب التوكن في الخلفية (لو فشل أو اتأخر، هيتحفظ
+    // أول ما ينجح والمزامنة هتستخدمه تلقائياً بعد كده من غير ما المستخدم يحس بحاجة).
+    tryFetchAuthToken(username, password);
     document.getElementById('login-overlay').classList.add('hidden');
     await afterLogin();
   }catch(err){
