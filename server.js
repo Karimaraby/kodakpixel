@@ -494,15 +494,30 @@ app.post('/api/auth/admin-reset-password', async (req, res) => {
     }
     const { rows } = await pool.query('SELECT * FROM users WHERE username = $1 AND deleted = 0', [username]);
     const user = rows[0];
+    const newHash = sha256Hex(newPassword);
+    const updatedAt = Date.now();
+
     if (!user) {
-      return res.status(400).json({ error: 'المستخدم غير موجود' });
+      // الحساب مش موجود على السيرفر خالص (مثلاً اتمسح بالغلط من Supabase، أو
+      // فقد أثناء مشاكل مزامنة قديمة). بما إن كود الاسترجاع صح، بننشئه من جديد
+      // كمدير - ده بيحل نفس مشكلة "نسيت الباسورد" في الحالة دي كمان.
+      const newId = 'id_' + Date.now().toString(36) + '_' + crypto.randomBytes(4).toString('hex');
+      const newUser = { id: newId, name: username, username, password_hash: newHash, role: 'admin', branch_id: null, monthly_salary: 0, updated_at: updatedAt, deleted: 0 };
+      try {
+        await pool.query(
+          'INSERT INTO users (id, name, username, password_hash, role, branch_id, monthly_salary, updated_at, deleted) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+          [newUser.id, newUser.name, newUser.username, newUser.password_hash, newUser.role, newUser.branch_id, newUser.monthly_salary, newUser.updated_at, newUser.deleted]
+        );
+      } catch (insertErr) {
+        console.error(insertErr);
+        return res.status(500).json({ error: 'reset_failed', message: insertErr.message });
+      }
+      return res.json({ ok: true, recreated: true, user: newUser });
     }
     if (user.role !== 'admin') {
       // الخاصية دي مقصورة على حسابات المدير بس، زي ما طُلب.
       return res.status(403).json({ error: 'الخاصية دي متاحة لحسابات المدير بس' });
     }
-    const newHash = sha256Hex(newPassword);
-    const updatedAt = Date.now();
     await pool.query('UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3', [newHash, updatedAt, user.id]);
     res.json({
       ok: true,
