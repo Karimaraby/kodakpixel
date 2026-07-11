@@ -517,14 +517,41 @@
     <div class="logo">Kodak<span style="color:var(--red);">Pixel</span></div>
     <p>سجّل دخولك للمتابعة</p>
     <div id="startup-error" style="display:none; background:#fdecea; color:var(--red); font-size:12px; padding:10px; border-radius:8px; text-align:right; margin-bottom:14px;"></div>
-    <label style="text-align:right;">اسم الدخول</label>
-    <input id="login-username" placeholder="username">
-    <label style="text-align:right;">كلمة المرور</label>
-    <input id="login-password" type="password" placeholder="••••••">
-    <button class="btn" style="width:100%; margin-top:18px;" id="login-btn">دخول</button>
-    <p id="login-error" style="color:var(--red); font-size:13px; display:none;">بيانات الدخول غير صحيحة</p>
+
+    <div id="login-form-box">
+      <label style="text-align:right;">اسم الدخول</label>
+      <input id="login-username" placeholder="username">
+      <label style="text-align:right;">كلمة المرور</label>
+      <input id="login-password" type="password" placeholder="••••••">
+      <button class="btn" style="width:100%; margin-top:18px;" id="login-btn">دخول</button>
+      <p id="login-error" style="color:var(--red); font-size:13px; display:none;">بيانات الدخول غير صحيحة</p>
+      <p style="text-align:center; margin-top:14px;">
+        <a href="#" id="forgot-password-link" style="font-size:13px; color:var(--muted);">نسيت كلمة المرور؟ (للمدير فقط)</a>
+      </p>
+    </div>
+
+    <!-- نموذج استرجاع باسورد المدير - مخفي افتراضياً، بيظهر بس لما تدوسي "نسيت كلمة المرور" -->
+    <div id="reset-password-box" style="display:none;">
+      <p style="font-size:13px; color:var(--muted); text-align:right;">
+        الخاصية دي للمدير بس، ومحتاجة "كود الاسترجاع" اللي محدد على السيرفر (اسألي صاحب المشروع لو مش عارفاه)،
+        وتحتاج اتصال بالإنترنت.
+      </p>
+      <label style="text-align:right;">اسم دخول المدير</label>
+      <input id="reset-username" placeholder="username">
+      <label style="text-align:right;">كود الاسترجاع</label>
+      <input id="reset-recovery-code" type="password" placeholder="كود الاسترجاع">
+      <label style="text-align:right;">كلمة المرور الجديدة</label>
+      <input id="reset-new-password" type="password" placeholder="كلمة مرور جديدة">
+      <button class="btn" style="width:100%; margin-top:18px;" id="reset-submit-btn">تغيير كلمة المرور</button>
+      <p style="text-align:center; margin-top:10px;">
+        <a href="#" id="reset-cancel-link" style="font-size:13px; color:var(--muted);">رجوع لتسجيل الدخول</a>
+      </p>
+      <p id="reset-error" style="color:var(--red); font-size:13px; display:none;"></p>
+      <p id="reset-success" style="color:var(--green); font-size:13px; display:none;"></p>
+    </div>
   </div>
 </div>
+
 
 <!-- Modal لإضافة مصروف -->
 <div class="modal-bg" id="expense-modal">
@@ -1327,6 +1354,85 @@ async function attemptLogin(){
 }
 document.getElementById('login-btn').onclick = attemptLogin;
 document.getElementById('login-password').addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
+
+// ============================================================
+// نسيت كلمة المرور (المدير فقط)
+// ============================================================
+document.getElementById('forgot-password-link').addEventListener('click', (e)=>{
+  e.preventDefault();
+  document.getElementById('login-form-box').style.display = 'none';
+  document.getElementById('reset-password-box').style.display = 'block';
+  document.getElementById('reset-error').style.display = 'none';
+  document.getElementById('reset-success').style.display = 'none';
+  // بنسهّل عليها: لو كانت كتبت اسم المستخدم في شاشة الدخول العادية، بننقله هنا تلقائي
+  const typedUsername = document.getElementById('login-username').value.trim();
+  if(typedUsername) document.getElementById('reset-username').value = typedUsername;
+});
+
+document.getElementById('reset-cancel-link').addEventListener('click', (e)=>{
+  e.preventDefault();
+  document.getElementById('reset-password-box').style.display = 'none';
+  document.getElementById('login-form-box').style.display = 'block';
+});
+
+document.getElementById('reset-submit-btn').addEventListener('click', async ()=>{
+  const errBox = document.getElementById('reset-error');
+  const okBox = document.getElementById('reset-success');
+  errBox.style.display = 'none';
+  okBox.style.display = 'none';
+
+  const username = document.getElementById('reset-username').value.trim();
+  const recoveryCode = document.getElementById('reset-recovery-code').value;
+  const newPassword = document.getElementById('reset-new-password').value;
+
+  if(!username || !recoveryCode || !newPassword){
+    errBox.textContent = 'اكتبي اسم الدخول وكود الاسترجاع وكلمة المرور الجديدة';
+    errBox.style.display = 'block';
+    return;
+  }
+  if(!navigator.onLine){
+    errBox.textContent = 'الخاصية دي محتاجة اتصال بالإنترنت، اتأكدي إن الجهاز أونلاين وحاولي تاني';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('reset-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'جاري التغيير...';
+  try{
+    const res = await fetch(API_URL + '/api/auth/admin-reset-password', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ username, recoveryCode, newPassword })
+    });
+    const data = await res.json();
+    if(!res.ok){
+      errBox.textContent = data.error || 'حصل خطأ، حاولي تاني';
+      errBox.style.display = 'block';
+      return;
+    }
+    // بنحفظ اليوزر المحدّث (بالباسورد الجديدة) في IndexedDB على طول، عشان الجهاز
+    // ده يقدر يدخل بالباسورد الجديدة فوراً حتى لو مالوش توكن مزامنة صالح.
+    await idbPut('users', data.user);
+    okBox.textContent = 'تم تغيير كلمة المرور بنجاح. تقدري تسجّلي دخول دلوقتي بالباسورد الجديدة.';
+    okBox.style.display = 'block';
+    document.getElementById('reset-recovery-code').value = '';
+    document.getElementById('reset-new-password').value = '';
+    setTimeout(()=>{
+      document.getElementById('login-username').value = username;
+      document.getElementById('login-password').value = '';
+      document.getElementById('reset-password-box').style.display = 'none';
+      document.getElementById('login-form-box').style.display = 'block';
+    }, 1500);
+  }catch(err){
+    errBox.textContent = 'تعذر الاتصال بالسيرفر، حاولي تاني';
+    errBox.style.display = 'block';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'تغيير كلمة المرور';
+  }
+});
+
 
 function applyRolePermissions(){
   document.getElementById('currentUserName').textContent = currentUser.name;

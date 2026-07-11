@@ -79,6 +79,17 @@ function sha256Hex(str) {
   return crypto.createHash('sha256').update(str, 'utf8').digest('hex');
 }
 
+// كود استرجاع خاص بإعادة تعيين باسورد المدير لو نسيها (خاصية "نسيت كلمة
+// المرور" في شاشة الدخول - للمدير بس). ده مختلف تماماً عن JWT_SECRET، وده
+// مقصود: صاحب المشروع بس اللي يعرف القيمة دي (بيحطها في متغيرات البيئة على
+// Render، ومش موجودة في الكود خالص)، وميديهاش لأي كاشير. لو المتغير ده مش
+// متحدد، الخاصية دي بتتقفل تلقائياً (بترجع خطأ واضح) بدل ما تشتغل بقيمة
+// افتراضية معروفة تبقى ثغرة أمنية.
+const ADMIN_RECOVERY_CODE = process.env.ADMIN_RECOVERY_CODE || '';
+if (!ADMIN_RECOVERY_CODE) {
+  console.warn('⚠️  ADMIN_RECOVERY_CODE مش متحدد - خاصية "نسيت كلمة المرور" هتكون مقفولة لحد ما تحددها.');
+}
+
 // ============ إنشاء الجداول (لو مش موجودة بالفعل) ============
 const SETUP_SQL = `
 CREATE TABLE IF NOT EXISTS branches (
@@ -435,6 +446,71 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'login_failed', message: err.message });
+  }
+});
+
+// ============ إعادة تعيين باسورد المدير (نسيت كلمة المرور) ============
+// بيشتغل بس لحساب لـه role = 'admin'، وبيحتاج "كود الاسترجاع" اللي محدد في
+// متغيرات البيئة (ADMIN_RECOVERY_CODE) - مش أي حد يعرفه، بس صاحب المشروع.
+// بعد النجاح، بيرجع صف اليوزر المحدّث كامل عشان الفرونت إند يحفظه محلياً على
+// طول (idbPut) - وده اللي بيخلي الجهاز ده يقدر يدخل بالباسورد الجديدة فوراً
+// حتى لو مالوش توكن مزامنة صالح أصلاً (وده بالظبط سبب المشكلة اللي بيحلها).
+const resetAttempts = new Map(); // نفس فكرة حماية تسجيل الدخول، مستقلة عنها
+function resetRateLimitKey(req) { return `reset::${req.ip}`; }
+function isResetRateLimited(key) {
+  const entry = resetAttempts.get(key);
+  if (!entry) return false;
+  if (Date.now() - entry.firstAttemptAt > LOGIN_WINDOW_MS) { resetAttempts.delete(key); return false; }
+  return entry.count >= LOGIN_MAX_ATTEMPTS;
+}
+function recordFailedReset(key) {
+  const entry = resetAttempts.get(key);
+  if (!entry || Date.now() - entry.firstAttemptAt > LOGIN_WINDOW_MS) {
+    resetAttempts.set(key, { count: 1, firstAttemptAt: Date.now() });
+  } else {
+    entry.count++;
+  }
+}
+
+app.post('/api/auth/admin-reset-password', async (req, res) => {
+  try {
+    if (!ADMIN_RECOVERY_CODE) {
+      return res.status(503).json({ error: 'feature_disabled', message: 'خاصية استرجاع الباسورد مش مفعّلة على السيرفر ده. لازم تحدد ADMIN_RECOVERY_CODE في إعدادات البيئة على Render الأول.' });
+    }
+    const { username, recoveryCode, newPassword } = req.body || {};
+    if (!username || !recoveryCode || !newPassword) {
+      return res.status(400).json({ error: 'اكتب اسم الدخول وكود الاسترجاع وكلمة المرور الجديدة' });
+    }
+    if (newPassword.length < 4) {
+      return res.status(400).json({ error: 'كلمة المرور الجديدة قصيرة جداً' });
+    }
+    const rlKey = resetRateLimitKey(req);
+    if (isResetRateLimited(rlKey)) {
+      return res.status(429).json({ error: 'محاولات كتير غلط، حاول تاني بعد شوية' });
+    }
+    if (recoveryCode !== ADMIN_RECOVERY_CODE) {
+      recordFailedReset(rlKey);
+      return res.status(401).json({ error: 'كود الاسترجاع غير صحيح' });
+    }
+    const { rows } = await pool.query('SELECT * FROM users WHERE username = $1 AND deleted = 0', [username]);
+    const user = rows[0];
+    if (!user) {
+      return res.status(400).json({ error: 'المستخدم غير موجود' });
+    }
+    if (user.role !== 'admin') {
+      // الخاصية دي مقصورة على حسابات المدير بس، زي ما طُلب.
+      return res.status(403).json({ error: 'الخاصية دي متاحة لحسابات المدير بس' });
+    }
+    const newHash = sha256Hex(newPassword);
+    const updatedAt = Date.now();
+    await pool.query('UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3', [newHash, updatedAt, user.id]);
+    res.json({
+      ok: true,
+      user: { id: user.id, name: user.name, username: user.username, password_hash: newHash, role: user.role, branch_id: user.branch_id, monthly_salary: user.monthly_salary, updated_at: updatedAt, deleted: 0 }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'reset_failed', message: err.message });
   }
 });
 
