@@ -995,11 +995,23 @@ async function syncNow(){
       partners: await idbAllRaw('partners'),
       partner_capital: await idbAllRaw('partner_capital'),
     };
-    const res = await fetch(API_URL + '/api/sync', {
-      method:'POST',
-      headers: buildAuthHeaders(),
-      body: JSON.stringify(payload)
-    });
+    // مهلة 20 ثانية على الطلب نفسه: من غيرها، لو السيرفر أو قاعدة البيانات
+    // متعلّقين لأي سبب، شاشة "جاري المزامنة..." كانت ممكن تفضل واقفة كده
+    // للأبد من غير أي رسالة توضح إن فيه مشكلة. دلوقتي بعد 20 ثانية بيبطل
+    // الطلب تلقائي ويظهر رسالة واضحة بدل التعليق الصامت.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(()=>controller.abort(), 20000);
+    let res;
+    try{
+      res = await fetch(API_URL + '/api/sync', {
+        method:'POST',
+        headers: buildAuthHeaders(),
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     if(!res.ok){
       if(res.status===401) throw new Error('auth_required');
       throw new Error('sync failed');
@@ -1029,6 +1041,8 @@ async function syncNow(){
     console.warn('sync error', err);
     if(err.message==='auth_required'){
       setSyncStatus('محتاج تسجّل خروج ودخول تاني عشان تتزامن', '');
+    } else if(err.name==='AbortError'){
+      setSyncStatus('السيرفر ماردش خلال 20 ثانية - جرّب تاني بعد شوية', '');
     } else {
       setSyncStatus('أوفلاين - لم تتم المزامنة', '');
     }
