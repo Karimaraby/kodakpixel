@@ -978,7 +978,33 @@ function buildAuthHeaders(){
   return headers;
 }
 
+// حماية مهمة جداً: النظام بينادي syncNow() في أكتر من 25 مكان مختلف (كل عملية
+// حفظ أو حذف)، فلو المستخدم عمل كذا حاجة بسرعة، أو ضغط "مزامنة الآن" أكتر من
+// مرة وهو مستني، كان بيتبعت أكتر من طلب مزامنة "فوق بعض" في نفس اللحظة. كل
+// طلب زي ده بيحاول يكتب على نفس الصفوف بالظبط في قاعدة البيانات، فبيحصل
+// تزاحم (لوك) بين الطلبات، وده اللي كان بيسبب أخطاء "statement timeout" في
+// السيرفر - مش مشكلة في قاعدة البيانات نفسها، مشكلة إن كذا طلب بيتلخبطوا مع
+// بعض. الحل: لو فيه مزامنة شغالة بالفعل، أي طلب جديد بينتظر لحد ما تخلص
+// وبعدين يتنفذ مرة واحدة بس (مش بيتراكم طلب فوق طلب).
+let syncInFlight = null;
+let resyncRequested = false;
+
 async function syncNow(){
+  if(syncInFlight){
+    resyncRequested = true; // فيه تغيير جديد حصل وإحنا لسه في مزامنة سابقة، هنعمل مزامنة تانية أول ما دي تخلص
+    return syncInFlight;
+  }
+  syncInFlight = performSync().finally(()=>{
+    syncInFlight = null;
+    if(resyncRequested){
+      resyncRequested = false;
+      syncNow();
+    }
+  });
+  return syncInFlight;
+}
+
+async function performSync(){
   setSyncStatus('جاري المزامنة...', 'pending');
   try{
     const since = Number(localStorage.getItem('kp_last_sync') || 0);
