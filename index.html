@@ -819,10 +819,10 @@ function safeSumFinancials(items, getVal){
 // أو تتحسب غلط على الشفت الأول اللي كان لسه مقفول.
 async function computeShiftFinancials(shiftId){
   const allInvoices = await idbAll('invoices');
-  const invoices = allInvoices.filter(i=>i.shift_id===shiftId && !i.deleted);
-  const expenses = (await idbAll('expenses')).filter(e=>e.shift_id===shiftId && !e.deleted);
-  const advances = (await idbAll('advances')).filter(a=>a.shift_id===shiftId && !a.deleted);
-  const payments = (await idbAll('payments')).filter(p=>p.shift_id===shiftId && !p.deleted);
+  const invoices = allInvoices.filter(i=>i.shift_id===shiftId);
+  const expenses = (await idbAll('expenses')).filter(e=>e.shift_id===shiftId);
+  const advances = (await idbAll('advances')).filter(a=>a.shift_id===shiftId);
+  const payments = (await idbAll('payments')).filter(p=>p.shift_id===shiftId);
 
   const byMethod = {cash:0, visa:0, 'insta pay':0, wallet:0};
   for(const method of Object.keys(byMethod)){

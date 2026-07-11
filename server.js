@@ -274,15 +274,8 @@ function normalizeRow(row, columns) {
   return columns.map(c => (row[c] === undefined ? null : row[c]));
 }
 
-// ملحوظة مهمة (إصلاح باج): أي INSERT بيفشل جوه معاملة (Transaction) في Postgres
-// بيخلي المعاملة كلها تدخل في حالة "aborted" - أي أمر تاني بعده (حتى لو سليم
-// 100%) بيترفض برسالة "current transaction is aborted...". يعني لو حصل خطأ في
-// صف واحد بس وسيبناه يمر من غير SAVEPOINT، كل باقي المزامنة (كل الجداول
-// التانية كمان) بتفشل وتترجع بالكامل. عشان كده كل صف بيتحفظ جوه SAVEPOINT
-// خاص بيه: لو الصف فشل، بنرجع (ROLLBACK) للنقطة دي بس، وباقي الصفوف والجداول
-// بيكملوا عادي وكأن حاجة ماحصلتش.
 async function upsertRows(client, table, rows, columns) {
-  if (!rows || rows.length === 0) return { skipped: [] };
+  if (!rows || rows.length === 0) return;
   const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
   const updateSet = columns.filter(c => c !== 'id').map(c => `${c}=excluded.${c}`).join(', ');
   const sql = `
@@ -291,24 +284,13 @@ async function upsertRows(client, table, rows, columns) {
     ON CONFLICT (id) DO UPDATE SET ${updateSet}
     WHERE excluded.updated_at > ${table}.updated_at
   `;
-  const skipped = [];
   for (const item of rows) {
-    await client.query('SAVEPOINT sp_row_upsert');
-    try {
-      await client.query(sql, normalizeRow(item, columns));
-      await client.query('RELEASE SAVEPOINT sp_row_upsert');
-    } catch (err) {
-      await client.query('ROLLBACK TO SAVEPOINT sp_row_upsert');
-      console.warn(`⚠️  تم تجاهل صف فشل حفظه أثناء المزامنة في جدول ${table}: id=${item.id} (${err.message})`);
-      skipped.push({ id: item.id, table, message: err.message });
-    }
+    await client.query(sql, normalizeRow(item, columns));
   }
-  return { skipped };
 }
 
 // معالجة خاصة لجدول المستخدمين: لو حصل تعارض في اسم الدخول (مثلاً فرعين
 // أنشأوا يوزر بنفس الاسم أوفلاين)، بنتجاهل السطر ده بس من غير ما نوقف باقي المزامنة.
-// (نفس مبدأ SAVEPOINT فوق، عشان تعارض اسم الدخول مايبوظش باقي المزامنة).
 async function upsertUsers(client, rows) {
   if (!rows || rows.length === 0) return { skipped: [] };
   const columns = TABLE_SCHEMAS.users;
@@ -322,21 +304,15 @@ async function upsertUsers(client, rows) {
   `;
   const skipped = [];
   for (const item of rows) {
-    await client.query('SAVEPOINT sp_user_upsert');
     try {
       await client.query(sql, normalizeRow(item, columns));
-      await client.query('RELEASE SAVEPOINT sp_user_upsert');
     } catch (err) {
-      await client.query('ROLLBACK TO SAVEPOINT sp_user_upsert');
       if (err.message && err.message.includes('duplicate key value violates unique constraint') && err.message.includes('username')) {
         console.warn(`⚠️  تم تجاهل تعارض اسم الدخول أثناء المزامنة: user ${item.id} (${item.username})`);
         skipped.push({ id: item.id, username: item.username });
         continue; // نكمل باقي السطور بدل ما نفشل المزامنة كلها
       }
-      // أي خطأ تاني (مش تعارض اسم الدخول): سجّليه وكملي باقي الصفوف بدل ما
-      // نوقف المزامنة كلها لأجل يوزر واحد بس فيه مشكلة غير متوقعة.
-      console.warn(`⚠️  تم تجاهل صف يوزر فشل حفظه أثناء المزامنة: id=${item.id} (${err.message})`);
-      skipped.push({ id: item.id, username: item.username, message: err.message });
+      throw err; // أي خطأ تاني (مش تعارض اسم الدخول) لازم يفضل يظهر
     }
   }
   return { skipped };
