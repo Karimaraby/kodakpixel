@@ -292,7 +292,12 @@ async function upsertRows(client, table, rows, columns) {
     const rowPlaceholders = chunk.map((item, rowIdx) => {
       const normalized = normalizeRow(item, columns);
       const placeholders = columns.map((_, colIdx) => {
-        values.push(normalized[columns[colIdx]]);
+        // ملحوظة: normalizeRow بترجع array مرتب بنفس ترتيب columns، فلازم
+        // نندّكسه برقم الموضع (colIdx) مش باسم العمود - كان في الكود القديم
+        // بيتحاول يندّكس الـ array باسم عمود (نص)، وده بيرجع undefined دايماً
+        // (يتحول لـ NULL في قاعدة البيانات)، يعني كل صف في أي جدول غير
+        // "users" كان بيتبعت بقيم فاضية بالكامل مهما كانت البيانات الحقيقية.
+        values.push(normalized[colIdx]);
         return `$${rowIdx * columns.length + colIdx + 1}`;
       });
       return `(${placeholders.join(', ')})`;
@@ -323,9 +328,19 @@ async function upsertUsers(client, rows) {
   `;
   const skipped = [];
   for (const item of rows) {
+    // مهم جداً: مجرد ما نمسك الخطأ بـ try/catch مش كفاية في Postgres. لو
+    // استعلام فشل جوه معاملة (transaction) شغالة، المعاملة كلها بتبقى
+    // "معطوبة" (aborted) وأي استعلام بعده هيفشل تلقائي برسالة "current
+    // transaction is aborted" - حتى لو مسكناه في JS. لازم نستخدم SAVEPOINT
+    // قبل كل صف، ولو فشل، نرجّع بـ ROLLBACK TO SAVEPOINT عشان نمسح أثر
+    // الفشل ده وبس، من غير ما نأثر على باقي المعاملة. من غيرها، أول تعارض
+    // اسم دخول (زي حالة "Karim" المكررة) كان بيوقف باقي المزامنة كلها بصمت.
+    await client.query('SAVEPOINT sp_user_upsert');
     try {
       await client.query(sql, normalizeRow(item, columns));
+      await client.query('RELEASE SAVEPOINT sp_user_upsert');
     } catch (err) {
+      await client.query('ROLLBACK TO SAVEPOINT sp_user_upsert');
       if (err.message && err.message.includes('duplicate key value violates unique constraint') && err.message.includes('username')) {
         console.warn(`⚠️  تم تجاهل تعارض اسم الدخول أثناء المزامنة: user ${item.id} (${item.username})`);
         skipped.push({ id: item.id, username: item.username });
