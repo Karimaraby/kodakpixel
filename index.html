@@ -523,6 +523,23 @@
     <input id="login-password" type="password" placeholder="••••••">
     <button class="btn" style="width:100%; margin-top:18px;" id="login-btn">دخول</button>
     <p id="login-error" style="color:var(--red); font-size:13px; display:none;">بيانات الدخول غير صحيحة</p>
+
+    <div style="text-align:center; margin-top:14px;">
+      <a href="#" id="forgot-password-link" style="font-size:13px; color:var(--muted);">نسيت كلمة المرور؟ (للمدير فقط)</a>
+    </div>
+
+    <!-- نموذج استرجاع باسورد المدير - مخفي افتراضياً، بيظهر بس لما تدوس "نسيت كلمة المرور" -->
+    <div id="reset-password-box" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid var(--border, #eee); text-align:right;">
+      <label style="text-align:right;">اسم الدخول (Karim)</label>
+      <input id="reset-username" placeholder="Karim">
+      <label style="text-align:right;">الكود السري (من إعدادات السيرفر)</label>
+      <input id="reset-recovery-code" type="password" placeholder="ADMIN_RECOVERY_CODE">
+      <label style="text-align:right;">كلمة المرور الجديدة</label>
+      <input id="reset-new-password" type="password" placeholder="كلمة مرور جديدة">
+      <button class="btn" style="width:100%; margin-top:12px;" id="reset-password-btn">تعيين كلمة المرور الجديدة</button>
+      <p id="reset-error" style="color:var(--red); font-size:13px; display:none; margin-top:8px;"></p>
+      <p id="reset-success" style="color:var(--green); font-size:13px; display:none; margin-top:8px;"></p>
+    </div>
   </div>
 </div>
 
@@ -641,10 +658,10 @@
 
 <!-- Modal ملخص إغلاق الشفت -->
 <div class="modal-bg summary-modal" id="shift-summary-modal">
-  <div class="modal">
+  <div class="modal" style="display:flex; flex-direction:column; padding-bottom:0;">
     <h3>ملخص الشفت</h3>
-    <div id="shift-summary-body"></div>
-    <div style="display:flex; gap:8px; margin-top:18px;">
+    <div id="shift-summary-body" style="overflow-y:auto; flex:1;"></div>
+    <div style="display:flex; gap:8px; padding:14px 0; background:#fff; position:sticky; bottom:0; border-top:1px solid #eee; margin-top:10px;">
       <button class="btn" id="ssm-print" style="flex:1;">طباعة</button>
       <button class="btn secondary" id="ssm-close" style="flex:1;">إغلاق وتسجيل الخروج</button>
     </div>
@@ -1328,7 +1345,35 @@ async function attemptLogin(){
     }
     const hash = await hashPassword(password);
     allUsers = await idbAll('users');
-    const user = allUsers.find(u=>u.username===username && u.password_hash===hash);
+    let user = allUsers.find(u=>u.username===username && u.password_hash===hash);
+
+    if(!user){
+      // مفيش تطابق محلي على الجهاز ده - يا إما جهاز جديد لسه معندوش نسخة من
+      // بيانات الموظفين خالص، يا إما كلمة المرور المحفوظة محلياً قديمة (اتغيرت
+      // على السيرفر من جهاز تاني). قبل ما نرفض الدخول، بنتأكد من السيرفر
+      // مباشرة لو فيه نت - لو السيرفر قال إن البيانات صح، بنسحب نسخة محدّثة
+      // من المستخدمين للجهاز ده ونكمل الدخول عادي، من غير ما المستخدم يحس
+      // إن فيه أي تعقيد حصل.
+      if(navigator.onLine){
+        document.getElementById('login-error').textContent = 'بنتأكد من السيرفر...';
+        document.getElementById('login-error').style.display = 'block';
+        const gotToken = await tryFetchAuthToken(username, password);
+        if(gotToken){
+          try{
+            const stateRes = await fetch(API_URL + '/api/full-state', { headers: buildAuthHeaders() });
+            if(stateRes.ok){
+              const state = await stateRes.json();
+              for(const table of ['branches','products','users','shifts','expenses','advances','payments','invoices','partners','partner_capital']){
+                if(state[table]?.length) await idbPutMany(table, state[table]);
+              }
+              allUsers = await idbAll('users');
+              user = allUsers.find(u=>u.username===username && u.password_hash===hash);
+            }
+          }catch(e){ console.warn('فشل سحب البيانات بعد التحقق من السيرفر:', e); }
+        }
+      }
+    }
+
     if(!user){
       document.getElementById('login-error').textContent = 'بيانات الدخول غير صحيحة';
       document.getElementById('login-error').style.display = 'block';
@@ -1358,6 +1403,77 @@ async function attemptLogin(){
 }
 document.getElementById('login-btn').onclick = attemptLogin;
 document.getElementById('login-password').addEventListener('keydown', e=>{ if(e.key==='Enter') attemptLogin(); });
+
+// نسيت كلمة المرور (المدير فقط) - بيبعت الكود السري لل endpoint المخصص على
+// السيرفر، ولو صح، بيغيّر كلمة المرور هناك مباشرة (على قاعدة البيانات
+// المركزية)، فمهما كانت فيه اختلافات قديمة بين الأجهزة، كل حاجة بترجع تتوحد
+// على الباسورد الجديد ده.
+document.getElementById('forgot-password-link').addEventListener('click', (e)=>{
+  e.preventDefault();
+  const box = document.getElementById('reset-password-box');
+  box.style.display = box.style.display==='none' ? 'block' : 'none';
+});
+document.getElementById('reset-password-btn').onclick = async ()=>{
+  const username = document.getElementById('reset-username').value.trim();
+  const recoveryCode = document.getElementById('reset-recovery-code').value;
+  const newPassword = document.getElementById('reset-new-password').value;
+  const errBox = document.getElementById('reset-error');
+  const okBox = document.getElementById('reset-success');
+  errBox.style.display = 'none';
+  okBox.style.display = 'none';
+  if(!username || !recoveryCode || !newPassword){
+    errBox.textContent = 'اكتب كل الخانات';
+    errBox.style.display = 'block';
+    return;
+  }
+  if(!navigator.onLine){
+    errBox.textContent = 'محتاج نت عشان تقدر تستخدم الاسترجاع (بيتصل بالسيرفر مباشرة)';
+    errBox.style.display = 'block';
+    return;
+  }
+  try{
+    const res = await fetch(API_URL + '/api/auth/admin-reset-password', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ username, recoveryCode, newPassword })
+    });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok){
+      errBox.textContent = data.message || data.error || 'حصل خطأ، حاول تاني';
+      errBox.style.display = 'block';
+      return;
+    }
+    okBox.textContent = 'تم تغيير كلمة المرور بنجاح على السيرفر. جاري تحديث الجهاز ده...';
+    okBox.style.display = 'block';
+    document.getElementById('reset-recovery-code').value = '';
+
+    // مش كفاية إننا نغيّر الباسورد على السيرفر بس - الجهاز ده لسه عنده نسخة
+    // قديمة محلياً من حساب المدير ممكن تكون مختلفة (وده أصلاً سبب المشكلة من
+    // الأول). فبنجيب توكن بالباسورد الجديد فورًا، وبيه نسحب أحدث نسخة صحيحة
+    // من المستخدمين من السيرفر ونحدّث بيها الجهاز ده تلقائيًا، عشان تسجيل
+    // الدخول العادي بعد كده يشتغل من أول مرة من غير ما "يتعلق" تاني.
+    const gotToken = await tryFetchAuthToken(username, newPassword);
+    if(gotToken){
+      try{
+        const stateRes = await fetch(API_URL + '/api/full-state', { headers: buildAuthHeaders() });
+        if(stateRes.ok){
+          const state = await stateRes.json();
+          if(state.users?.length) await idbPutMany('users', state.users);
+          okBox.textContent = 'تمام، اتظبط كل حاجة. سجّل دخول دلوقتي بكلمة المرور الجديدة.';
+          document.getElementById('login-username').value = username;
+          document.getElementById('reset-new-password').value = '';
+          return;
+        }
+      }catch(e){ /* هنسيب الرسالة العادية تحت لو الخطوة الإضافية دي فشلت */ }
+    }
+    okBox.textContent = 'تم تغيير كلمة المرور على السيرفر. سجّل دخول دلوقتي بكلمة المرور الجديدة (لو مقبلش من أول مرة، جرب تاني بعد ثواني).';
+    document.getElementById('login-username').value = username;
+    document.getElementById('reset-new-password').value = '';
+  }catch(err){
+    errBox.textContent = 'تعذر الوصول للسيرفر: ' + err.message;
+    errBox.style.display = 'block';
+  }
+};
 
 function applyRolePermissions(){
   document.getElementById('currentUserName').textContent = currentUser.name;
@@ -1456,7 +1572,8 @@ async function closeCurrentShift(actualCash){
   // ولو حد تاني هيشتغل بعده هيسجل دخوله هو ويتفتح له شفت جديد باسمه.
 }
 
-function renderShiftSummary(s){
+function renderShiftSummary(s, options){
+  const shouldLogout = !options || options.logoutAfter !== false;
   const body = document.getElementById('shift-summary-body');
   const varianceLabel = s.variance===0 ? 'مطابق' : (s.variance>0 ? 'زيادة' : 'عجز');
   const varianceColor = s.variance===0 ? 'var(--green)' : 'var(--red)';
@@ -1479,14 +1596,20 @@ function renderShiftSummary(s){
     <div class="summary-row"><span>الكاش الفعلي اللي اتكتب</span><span>${(s.actualCash??0).toFixed(2)} ج.م</span></div>
     <div class="summary-row total"><span style="color:${varianceColor};">الفرق (${varianceLabel})</span><span style="color:${varianceColor};">${Math.abs(s.variance).toFixed(2)} ج.م</span></div>
   `;
+  document.getElementById('ssm-close').textContent = shouldLogout ? 'إغلاق وتسجيل الخروج' : 'إغلاق';
+  document.getElementById('ssm-close').dataset.logoutAfter = shouldLogout ? '1' : '0';
   document.getElementById('shift-summary-modal').classList.add('active');
 }
 document.getElementById('ssm-close').onclick = ()=>{
   document.getElementById('shift-summary-modal').classList.remove('active');
-  // إغلاق الشفت = تسجيل خروج الكاشير من الجهاز ده
-  localStorage.removeItem('kp_current_user_id');
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-  location.reload();
+  // إغلاق الشفت بتاع الكاشير نفسه = تسجيل خروج تلقائي من الجهاز ده. لكن لو
+  // المدير هو اللي قفل شفت شخص تاني (أو شفت تاريخي) من شاشة "تفاصيل الشفت"،
+  // مينفعش نسجّله هو خروج من حسابه هو، فبنسيبه في مكانه وبس نقفل الشاشة.
+  if(document.getElementById('ssm-close').dataset.logoutAfter !== '0'){
+    localStorage.removeItem('kp_current_user_id');
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    location.reload();
+  }
 };
 document.getElementById('ssm-print').onclick = ()=>window.print();
 
@@ -2243,6 +2366,7 @@ async function closeShiftByAdmin(shiftId, actualCash){
   const fin = await computeShiftFinancials(shiftId);
   const variance = centsToNumber(toCents(actualCash) - toCents(fin.netCash));
   const summary = { ...fin, actualCash, variance, closedAt: now() };
+  const isOwnCurrentShift = currentShift && currentShift.id===shiftId;
 
   shift.status = 'closed';
   shift.closed_at = now();
@@ -2252,11 +2376,20 @@ async function closeShiftByAdmin(shiftId, actualCash){
   await refreshShiftsCache();
 
   // لو المدير قفل شفته هو نفسه من الشاشة دي، بنحدّث شريط الشفت العلوي كمان
-  if(currentShift && currentShift.id===shiftId){
+  if(isOwnCurrentShift){
     currentShift = null;
     renderShiftBar();
   }
   if(navigator.onLine) syncNow();
+
+  // نقفل شاشة تفاصيل الشفت ونوري نفس شاشة "ملخص الشفت" (بزرار الطباعة) اللي
+  // بتظهر للكاشير العادي وقت ما يقفل شفته - عشان تجربة موحّدة، والمدير كمان
+  // يقدر يطبع الملخص فورًا لو حابب، مش بس يقفل الشفت بصمت من غير أي تأكيد.
+  // لو الشفت اللي بيتقفل مش شفت المدير نفسه (شفت موظف تاني مثلاً)، مينفعش
+  // نسجّل خروج المدير من حسابه بعد ما يقفل الشاشة دي.
+  document.getElementById('shift-details-modal').classList.remove('active');
+  renderShiftSummary(summary, { logoutAfter: isOwnCurrentShift });
+  showToast('تم إغلاق الشفت بنجاح ✅', 'success');
 }
 
 // Wrappers بتحذف ثم تعيد رسم شاشة تفاصيل الشفت المفتوحة عشان القائمة تتحدث فوراً
