@@ -98,9 +98,9 @@
     font-size:16px; line-height:1; cursor:pointer; z-index:10;
   }
   .modal-x:hover{background:#e4e5e8;}
-  /* في النافذة الطويلة (تفاصيل الشفت) اللي بتتسحب لتحت، لازم زرار الإغلاق
-     يفضل ظاهر فوق طول الوقت حتى وانت بتسحب جوه النافذة، مش يختفي مع المحتوى. */
-  .wide-modal .modal-x-sticky{
+  /* في أي نافذة ممكن تتسحب لتحت (تفاصيل الشفت، تفاصيل الفاتورة)، لازم زرار
+     الإغلاق يفضل ظاهر فوق طول الوقت حتى وانت بتسحب جوه النافذة. */
+  .wide-modal .modal-x-sticky, .summary-modal .modal-x-sticky{
     position:sticky; top:0; inset-inline-end:auto; display:block;
     margin-inline-start:auto; margin-inline-end:-10px;
   }
@@ -117,7 +117,7 @@
   .shift-bar .btn{padding:7px 12px; font-size:13px;}
   .user-chip{display:flex; align-items:center; gap:8px; font-size:13px; color:#cfd0d4;}
   .user-chip .role-tag{background:#33343a; padding:2px 8px; border-radius:20px; font-size:11px;}
-  .summary-modal .modal{width:460px;}
+  .summary-modal .modal{width:460px; max-height:90vh; overflow-y:auto;}
   .summary-row{display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:14px;}
   .summary-row.total{font-weight:800; font-size:16px; color:var(--red); border-bottom:none;}
   select:disabled, input:disabled{background:#F0F1F3; color:var(--muted); cursor:not-allowed;}
@@ -702,7 +702,7 @@
 
 <div class="modal-bg summary-modal" id="invoice-details-modal">
   <div class="modal" style="width:480px;">
-  <button type="button" class="modal-x" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
+  <button type="button" class="modal-x modal-x-sticky" onclick="this.closest('.modal-bg').classList.remove('active')" aria-label="إغلاق">✕</button>
     <h3 id="invoice-details-title">تفاصيل الفاتورة</h3>
     <div id="invoice-details-body"></div>
     <div style="display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;">
@@ -951,7 +951,8 @@ function buildAuthHeaders(){
   return headers;
 }
 
-async function syncNow(){
+async function syncNow(opts){
+  const throwOnError = opts && opts.throwOnError;
   setSyncStatus('جاري المزامنة...', 'pending');
   try{
     const since = Number(localStorage.getItem('kp_last_sync') || 0);
@@ -968,14 +969,22 @@ async function syncNow(){
       partners: await idbAllRaw('partners'),
       partner_capital: await idbAllRaw('partner_capital'),
     };
-    const res = await fetch(API_URL + '/api/sync', {
-      method:'POST',
-      headers: buildAuthHeaders(),
-      body: JSON.stringify(payload)
-    });
+    let res;
+    try{
+      res = await fetch(API_URL + '/api/sync', {
+        method:'POST',
+        headers: buildAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+    }catch(networkErr){
+      // فشل الاتصال نفسه (مفيش نت فعليًا، أو السيرفر مش راضي يرد خالص).
+      throw new Error('تعذر الوصول للسيرفر: ' + networkErr.message);
+    }
     if(!res.ok){
+      let detail = '';
+      try{ detail = await res.text(); }catch(e){}
       if(res.status===401) throw new Error('auth_required');
-      throw new Error('sync failed');
+      throw new Error(`السيرفر رد بخطأ (${res.status}): ${detail.slice(0,300)}`);
     }
     const data = await res.json();
     for(const t of ['branches','products','invoices','users','shifts','expenses','advances','payments','partners','partner_capital']){
@@ -1005,6 +1014,7 @@ async function syncNow(){
     } else {
       setSyncStatus('أوفلاين - لم تتم المزامنة', '');
     }
+    if(throwOnError) throw err;
   }
 }
 
@@ -2981,7 +2991,15 @@ async function refreshAll(){
   }
 }
 
-document.getElementById('syncBtn').onclick = syncNow;
+document.getElementById('syncBtn').onclick = async ()=>{
+  try{
+    await syncNow({ throwOnError: true });
+  }catch(err){
+    // بس هنا (الضغط اليدوي على الزرار) بنوري تفاصيل الخطأ الحقيقية،
+    // عشان نعرف السبب الفعلي للمشكلة بدل ما نخمّن.
+    alert('فشلت المزامنة. السبب الفعلي:\n' + (err && err.message ? err.message : err));
+  }
+};
 
 (async function init(){
   try{
