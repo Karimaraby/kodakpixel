@@ -1456,7 +1456,8 @@ async function closeCurrentShift(actualCash){
   // ولو حد تاني هيشتغل بعده هيسجل دخوله هو ويتفتح له شفت جديد باسمه.
 }
 
-function renderShiftSummary(s){
+function renderShiftSummary(s, options){
+  const shouldLogout = !options || options.logoutAfter !== false;
   const body = document.getElementById('shift-summary-body');
   const varianceLabel = s.variance===0 ? 'مطابق' : (s.variance>0 ? 'زيادة' : 'عجز');
   const varianceColor = s.variance===0 ? 'var(--green)' : 'var(--red)';
@@ -1479,14 +1480,20 @@ function renderShiftSummary(s){
     <div class="summary-row"><span>الكاش الفعلي اللي اتكتب</span><span>${(s.actualCash??0).toFixed(2)} ج.م</span></div>
     <div class="summary-row total"><span style="color:${varianceColor};">الفرق (${varianceLabel})</span><span style="color:${varianceColor};">${Math.abs(s.variance).toFixed(2)} ج.م</span></div>
   `;
+  document.getElementById('ssm-close').textContent = shouldLogout ? 'إغلاق وتسجيل الخروج' : 'إغلاق';
+  document.getElementById('ssm-close').dataset.logoutAfter = shouldLogout ? '1' : '0';
   document.getElementById('shift-summary-modal').classList.add('active');
 }
 document.getElementById('ssm-close').onclick = ()=>{
   document.getElementById('shift-summary-modal').classList.remove('active');
-  // إغلاق الشفت = تسجيل خروج الكاشير من الجهاز ده
-  localStorage.removeItem('kp_current_user_id');
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-  location.reload();
+  // إغلاق الشفت بتاع الكاشير نفسه = تسجيل خروج تلقائي من الجهاز ده. لكن لو
+  // المدير هو اللي قفل شفت شخص تاني (أو شفت تاريخي) من شاشة "تفاصيل الشفت"،
+  // مينفعش نسجّله هو خروج من حسابه هو، فبنسيبه في مكانه وبس نقفل الشاشة.
+  if(document.getElementById('ssm-close').dataset.logoutAfter !== '0'){
+    localStorage.removeItem('kp_current_user_id');
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    location.reload();
+  }
 };
 document.getElementById('ssm-print').onclick = ()=>window.print();
 
@@ -2243,6 +2250,7 @@ async function closeShiftByAdmin(shiftId, actualCash){
   const fin = await computeShiftFinancials(shiftId);
   const variance = centsToNumber(toCents(actualCash) - toCents(fin.netCash));
   const summary = { ...fin, actualCash, variance, closedAt: now() };
+  const isOwnCurrentShift = currentShift && currentShift.id===shiftId;
 
   shift.status = 'closed';
   shift.closed_at = now();
@@ -2252,11 +2260,20 @@ async function closeShiftByAdmin(shiftId, actualCash){
   await refreshShiftsCache();
 
   // لو المدير قفل شفته هو نفسه من الشاشة دي، بنحدّث شريط الشفت العلوي كمان
-  if(currentShift && currentShift.id===shiftId){
+  if(isOwnCurrentShift){
     currentShift = null;
     renderShiftBar();
   }
   if(navigator.onLine) syncNow();
+
+  // نقفل شاشة تفاصيل الشفت ونوري نفس شاشة "ملخص الشفت" (بزرار الطباعة) اللي
+  // بتظهر للكاشير العادي وقت ما يقفل شفته - عشان تجربة موحّدة، والمدير كمان
+  // يقدر يطبع الملخص فورًا لو حابب، مش بس يقفل الشفت بصمت من غير أي تأكيد.
+  // لو الشفت اللي بيتقفل مش شفت المدير نفسه (شفت موظف تاني مثلاً)، مينفعش
+  // نسجّل خروج المدير من حسابه بعد ما يقفل الشاشة دي.
+  document.getElementById('shift-details-modal').classList.remove('active');
+  renderShiftSummary(summary, { logoutAfter: isOwnCurrentShift });
+  showToast('تم إغلاق الشفت بنجاح ✅', 'success');
 }
 
 // Wrappers بتحذف ثم تعيد رسم شاشة تفاصيل الشفت المفتوحة عشان القائمة تتحدث فوراً
