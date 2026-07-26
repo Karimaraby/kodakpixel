@@ -268,7 +268,6 @@
     <div class="top-actions">
       <h2 style="margin:0;">إدارة المنتجات</h2>
       <div style="display:flex; gap:8px;">
-        <button class="btn secondary" id="import-products-btn">استيراد قائمة المنتجات القياسية</button>
         <button class="btn" id="add-product-btn">+ منتج جديد</button>
       </div>
     </div>
@@ -1208,19 +1207,11 @@ const STANDARD_PRODUCTS = [
   ['مرايا مدور',220],['مرايا قلب',220]
 ];
 
-async function importStandardProducts(){
-  if(allBranches.length===0) return alert('أضف فرع واحد على الأقل الأول');
-  const branchId = document.getElementById('inv-branch').value || allBranches[0].id;
-  if(!confirm(`هيتم إضافة ${STANDARD_PRODUCTS.length} منتج للفرع "${branchName(branchId)}". متابعة؟`)) return;
-  const records = STANDARD_PRODUCTS.map(([name, price])=>({
-    id: uid(), name, code:'', price, branch_id: branchId, stock_qty:0, updated_at: now(), deleted:0
-  }));
-  await idbPutMany('products', records);
-  await refreshProducts();
-  alert('تم استيراد المنتجات بنجاح');
-  if(navigator.onLine) syncNow();
-}
-document.getElementById('import-products-btn').onclick = importStandardProducts;
+// ملحوظة: زرار "استيراد قائمة المنتجات القياسية" اتشال من واجهة إدارة
+// المنتجات، لإنه كان بيضيف الـ 62 منتج دول كنسخة جديدة كل مرة يتدوس فيها (من
+// غير ما يتأكد لو المنتجات دي موجودة بالفعل)، وده كان بيسبب تكرار المنتجات
+// بسعرين مختلفين (القديم والجديد). البذر التلقائي الآمن (تحت) لسه شغال زي
+// ما هو للأنظمة الجديدة تمامًا بس.
 
 // بذر المنتجات القياسية تلقائياً مرة واحدة بس (أول تشغيل للنظام على الجهاز ده)
 // عشان المنتجات تفضل موجودة دايماً من غير ما حد يحتاج يدوس "استيراد" كل مرة.
