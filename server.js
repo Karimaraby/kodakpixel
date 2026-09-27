@@ -34,10 +34,19 @@ app.use(express.json({ limit: '10mb' }));
 
 // السيرفر ده بيقدّم واجهة الكاشير (الفرونت إند) هو نفسه، عشان الموقع كله يبقى
 // "حاجة واحدة" على رابط واحد: تكتب عنوان السيرفر في المتصفح، وتلاقي الكاشير
-// شغال على طول، من غير ما تحتاج تفتح ملف الواجهة منفصل. لو عايز تحط الفرونت
-// إند مكان تاني، غيّر المسار ده بس.
-const FRONTEND_DIR = process.env.KODAK_FRONTEND_DIR || path.join(__dirname, '..', 'frontend');
+// شغال على طول، من غير ما تحتاج تفتح ملف الواجهة منفصل.
+// ملحوظة: index.html موجود في نفس فولدر server.js بالظبط (مش في فولدر منفصل
+// اسمه frontend)، فالمسار الافتراضي هنا هو __dirname نفسه. لو حبيت يوماً ما
+// تحط الواجهة في فولدر منفصل، غيّر متغير البيئة KODAK_FRONTEND_DIR بس.
+const FRONTEND_DIR = process.env.KODAK_FRONTEND_DIR || __dirname;
 app.use(express.static(FRONTEND_DIR));
+
+// أي رابط مش API ومش ملف ثابت (زي لو حد فتح /reports أو عمل ريفريش لصفحة
+// داخلية) يرجع له index.html نفسه بدل "Cannot GET" — الواجهة نفسها (SPA)
+// هي اللي بتتحكم في عرض الشاشة المطلوبة بجافاسكريبت.
+app.get(/^(?!\/api\/).*/, (req, res) => {
+  res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
+});
 
 // رابط الاتصال بقاعدة البيانات (Postgres) - لازم يتحدد من متغير بيئة
 // DATABASE_URL (بتجيبه من صفحة الإعدادات في Supabase، اسمه "Connection string").
